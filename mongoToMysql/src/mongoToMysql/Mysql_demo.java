@@ -1,5 +1,7 @@
 package mongoToMysql;
+import java.math.RoundingMode;
 import java.sql.*;
+import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
@@ -15,6 +17,7 @@ import com.mongodb.MongoClient;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoDatabase;
 import com.mongodb.client.model.Sorts;
+
 
 
 
@@ -174,29 +177,37 @@ public class Mysql_demo {
 				Zona=r.getInt("Zona");
 				id_cultura=r.getInt("ID_Cultura");
 				for(SensorData i: outfree) {
+					ResultSet r2= ps.executeQuery("SELECT * FROM medicao");
+					int id_medicao=9999;
+					if(r2.getTimestamp("Hora").equals(i.data)) {
+						id_medicao=Integer.valueOf(r2.getInt("ID_Medicao"));
+					}
+					DecimalFormat decimal = new DecimalFormat("#.##");
+					decimal.format(i.medicao);
+					decimal.setRoundingMode(RoundingMode.DOWN);
+					Timestamp timestamp = new Timestamp(System.currentTimeMillis());
+					Statement stmt = conn.createStatement();
+					String query = "NULL";
 					if(i.sensor.startsWith("T")) {
 						if(Limite_Sup_Temp<=Integer.valueOf(i.medicao) && Integer.valueOf(i.medicao)<=Limite_Sup_Critico_Temp) {
 							if(Zona==(Integer.valueOf(i.sensor.charAt(i.sensor.length()-1)))) {
-								//alerta
+								query = "INSERT INTO alerta " + "VALUES("+timestamp+","+0+",'ALERTA SUPERIOR do sensor "+i.sensor+" da zona "+i.zona+".,"+id_cultura+","+id_medicao+","+decimal+")";
 							}
-							
-							
 						}
 						else if(Integer.valueOf(i.medicao)>=Limite_Sup_Critico_Temp) {
 							if(Zona==(Integer.valueOf(i.sensor.charAt(i.sensor.length()-1)))) {
-								//alerta critico
+								query = "INSERT INTO alerta " + "VALUES("+timestamp+","+1+",'ALERTA CRÍTICO SUPERIOR do sensor "+i.sensor+" da zona "+i.zona+".,"+id_cultura+","+id_medicao+","+decimal+")";
 							}
 						}
 						else if(Limite_Inf_Temp>=Integer.valueOf(i.medicao) && Integer.valueOf(i.medicao)>=Limite_Inf_Critico_Temp) {
 							if(Zona==(Integer.valueOf(i.sensor.charAt(i.sensor.length()-1)))) {
-								//alerta
-							
+								query = "INSERT INTO alerta " + "VALUES("+timestamp+","+0+",'ALERTA INFERIOR do sensor "+i.sensor+" da zona "+i.zona+".,"+id_cultura+","+id_medicao+","+decimal+")";
 							}
 							
 						}
 						else if(Integer.valueOf(i.medicao)<=Limite_Inf_Critico_Temp) {
 							if(Zona==(Integer.valueOf(i.sensor.charAt(i.sensor.length()-1)))) {
-								//alerta critico
+								query = "INSERT INTO alerta " + "VALUES("+timestamp+","+1+",'ALERTA CRÍTICO INFERIOR do sensor "+i.sensor+" da zona "+i.zona+".,"+id_cultura+","+id_medicao+","+decimal+")";
 							}
 						}
 						
@@ -205,57 +216,49 @@ public class Mysql_demo {
 					if(i.sensor.startsWith("H")) {
 						if(Limite_Sup_Hum<=Integer.valueOf(i.medicao) && Integer.valueOf(i.medicao)<=Limite_Sup_Critico_Hum) {
 							if(Zona==(Integer.valueOf(i.sensor.charAt(i.sensor.length()-1)))) {
-								//alerta
+								query = "INSERT INTO alerta " + "VALUES("+timestamp+","+0+",'ALERTA SUPERIOR do sensor "+i.sensor+" da zona "+i.zona+".,"+id_cultura+","+id_medicao+","+decimal+")";
 							}
-							
-							
 						}
 						else if(Integer.valueOf(i.medicao)>=Limite_Sup_Critico_Hum) {
 							if(Zona==(Integer.valueOf(i.sensor.charAt(i.sensor.length()-1)))) {
-								//alerta critico
+								query = "INSERT INTO alerta " + "VALUES("+timestamp+","+1+",'ALERTA CRÍTICO SUPERIOR do sensor "+i.sensor+" da zona "+i.zona+".,"+id_cultura+","+id_medicao+","+decimal+")";
 							}
 						}
 						else if(Limite_Inf_Hum>=Integer.valueOf(i.medicao) && Integer.valueOf(i.medicao)>=Limite_Inf_Critico_Hum) {
 							if(Zona==(Integer.valueOf(i.sensor.charAt(i.sensor.length()-1)))) {
-								//alerta
-							
+								query = "INSERT INTO alerta " + "VALUES("+timestamp+","+0+",'ALERTA INFERIOR do sensor "+i.sensor+" da zona "+i.zona+".,"+id_cultura+","+id_medicao+","+decimal+")";
 							}
 							
 						}
 						else if(Integer.valueOf(i.medicao)<=Limite_Inf_Critico_Hum) {
 							if(Zona==(Integer.valueOf(i.sensor.charAt(i.sensor.length()-1)))) {
-								//alerta critico
+								query = "INSERT INTO alerta " + "VALUES("+timestamp+","+1+",'ALERTA CRÍTICO INFERIOR do sensor "+i.sensor+" da zona "+i.zona+".,"+id_cultura+","+id_medicao+","+decimal+")";
 							}
 						}
-					
-					
 					}
 					if(i.sensor.startsWith("L")) {
 						if(Limite_Sup_Luz<=Integer.valueOf(i.medicao) && Integer.valueOf(i.medicao)<=Limite_Sup_Critico_Luz) {
 							if(Zona==(Integer.valueOf(i.sensor.charAt(i.sensor.length()-1)))) {
-								//alerta
+								query = "INSERT INTO alerta " + "VALUES("+timestamp+","+0+",'ALERTA SUPERIOR do sensor "+i.sensor+" da zona "+i.zona+".,"+id_cultura+","+id_medicao+","+decimal+")";
 							}
-							
-							
 						}
 						else if(Integer.valueOf(i.medicao)>=Limite_Sup_Critico_Luz) {
 							if(Zona==(Integer.valueOf(i.sensor.charAt(i.sensor.length()-1)))) {
-								//alerta critico
+								query = "INSERT INTO alerta " + "VALUES("+timestamp+","+1+",'ALERTA CRÍTICO SUPERIOR do sensor "+i.sensor+" da zona "+i.zona+".,"+id_cultura+","+id_medicao+","+decimal+")";
 							}
 						}
 						else if(Limite_Inf_Luz>=Integer.valueOf(i.medicao) && Integer.valueOf(i.medicao)>=Limite_Inf_Critico_Luz) {
 							if(Zona==(Integer.valueOf(i.sensor.charAt(i.sensor.length()-1)))) {
-								//alerta
-							
+								query = "INSERT INTO alerta " + "VALUES("+timestamp+","+0+",'ALERTA INFERIOR do sensor "+i.sensor+" da zona "+i.zona+".,"+id_cultura+","+id_medicao+","+decimal+")";
 							}
-							
 						}
 						else if(Integer.valueOf(i.medicao)<=Limite_Inf_Critico_Luz) {
 							if(Zona==(Integer.valueOf(i.sensor.charAt(i.sensor.length()-1)))) {
-								//alerta critico
+								query = "INSERT INTO alerta " + "VALUES("+timestamp+","+1+",'ALERTA CRÍTICO INFERIOR do sensor "+i.sensor+" da zona "+i.zona+".,"+id_cultura+","+id_medicao+","+decimal+")";
 							}
 						}
 					}
+					stmt.executeUpdate(query);
 				}
 			}
 		} catch (SQLException e) {
