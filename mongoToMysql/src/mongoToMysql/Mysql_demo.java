@@ -203,15 +203,12 @@ public class Mysql_demo {
 							if(Zona==(Integer.valueOf(i.sensor.charAt(i.sensor.length()-1)))) {
 								query = "INSERT INTO alerta " + "VALUES("+timestamp+","+0+",'ALERTA INFERIOR do sensor "+i.sensor+" da zona "+i.zona+".,"+id_cultura+","+id_medicao+","+decimal+")";
 							}
-							
 						}
 						else if(Integer.valueOf(i.medicao)<=Limite_Inf_Critico_Temp) {
 							if(Zona==(Integer.valueOf(i.sensor.charAt(i.sensor.length()-1)))) {
 								query = "INSERT INTO alerta " + "VALUES("+timestamp+","+1+",'ALERTA CRÍTICO INFERIOR do sensor "+i.sensor+" da zona "+i.zona+".,"+id_cultura+","+id_medicao+","+decimal+")";
 							}
 						}
-						
-							
 					}
 					if(i.sensor.startsWith("H")) {
 						if(Limite_Sup_Hum<=Integer.valueOf(i.medicao) && Integer.valueOf(i.medicao)<=Limite_Sup_Critico_Hum) {
