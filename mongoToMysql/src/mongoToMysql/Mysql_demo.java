@@ -47,10 +47,7 @@ public class Mysql_demo {
 		try {
 			Class.forName(driver).newInstance();
 			conn = DriverManager.getConnection(url + dbName, userName, password);
-			// PreparedStatement ps=conn.prepareStatement("INSERT into
-			// cultura(Nome_Cultura,ID_Zona) VALUES ('teste','12')");
-			// Statement stmt = conn.createStatement();
-			// ps.executeUpdate();
+
 
 
 		} catch (InstantiationException | IllegalAccessException | ClassNotFoundException | SQLException e) {
@@ -59,29 +56,36 @@ public class Mysql_demo {
 		}
 	}
 
-	public void start() throws SQLException {
+	public void start() throws SQLException, InterruptedException {
 		while(true) {
 			receive_data();
 			splitMeasurement();
 			//checkParameters();
 			received.clear();
 			outfree.clear();
+			Thread.sleep(1000);
 		}
 
 	}
 
 	public void receive_data() {
-		for (Document doc : coll.find().sort(Sorts.descending("_id"))) {
+		
+		for (Document doc : coll.find().sort(Sorts.descending("_id")).limit(1)) {
 			Gson gson = new Gson();
 			MongoLocalDocument mcd = gson.fromJson(doc.toJson(), MongoLocalDocument.class);
-			received = (List<SensorData>) mcd.sensors;
+			
+			for(SensorData a :mcd.sensors) {
+				 received.add(a);
+			}
+;
 			
 		}
 
 	}
-	// separar e meter nos respectivos array list para tratamento
+
 	public void splitMeasurement() throws SQLException {
 		for (SensorData i : received) {
+			System.out.println(i+"  -----------------------------------------------------------------------antes de enviar");
 			if (i.sensor.startsWith("T")) {
 				insertMysqlMeasurement(i);
 			}
@@ -137,7 +141,6 @@ public class Mysql_demo {
         	String aux=data.medicao;
         	while(aux.length()-1<6) {
         		aux=aux.concat("0");
-        		System.out.println(aux);
         	}
         	med_trata = aux;
         	
@@ -145,7 +148,7 @@ public class Mysql_demo {
         else {
         	 med_trata =data.medicao.substring(0, 6);
         }
-        System.out.println(med_trata);
+      
 		if (data.sensor.startsWith("T")) {
             if (searchOutliers(data) ||checkMysqlDupli(data)) {// 
 				System.out.println(data.sensor+"' , '"+ med_trata.substring(0, 6)+"'  "+data.sensor.charAt(data.sensor.length()-1));
@@ -156,7 +159,7 @@ public class Mysql_demo {
 				
 				ps.executeUpdate();
 			} else {
-				System.out.println(data.sensor+"' , '"+ med_trata.substring(0, 6) +"'  "+data.sensor.charAt(data.sensor.length()-1));
+				System.out.println("não e out     "+data.sensor+"' , '"+ med_trata.substring(0, 6) +"'  "+data.sensor.charAt(data.sensor.length()-1));
 				PreparedStatement ps = conn
 						.prepareStatement("INSERT INTO medicao(Hora, Tipo, Outlier, Leitura, ID_Zona) VALUES (' "+ a+ " ' "
 								+ ",' "+ data.sensor +"' , ' "+ 0+ " ' ,  ' "+ med_trata.substring(0, 6) +"'"+ 
@@ -349,6 +352,14 @@ public class Mysql_demo {
 		demo.mongodbConnection();
 		demo.mysqlConnection();
 
-		demo.start();
+		try {
+			demo.start();
+		} catch (SQLException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (InterruptedException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
 	}
 }
