@@ -22,6 +22,7 @@ import com.mongodb.client.MongoDatabase;
 import com.mongodb.client.model.Sorts;
 import com.mysql.cj.protocol.x.SyncFlushDeflaterOutputStream;
 
+
 public class Mysql_demo {
 	Connection conn = null;
 	MongoClient mongoC;
@@ -29,7 +30,7 @@ public class Mysql_demo {
 	MongoCollection<Document> coll;
 	public List<SensorData> received = new ArrayList<>();
 	public List<SensorData> outfree = new ArrayList<>();
-
+	private int calibrar=0;
 	public void mongodbConnection() {
 
 		mongoC = new MongoClient("localhost", 27017);
@@ -60,7 +61,7 @@ public class Mysql_demo {
 		while(true) {
 			receive_data();
 			splitMeasurement();
-			//checkParameters();
+			checkParameters();
 			received.clear();
 			outfree.clear();
 			Thread.sleep(1000);
@@ -77,7 +78,7 @@ public class Mysql_demo {
 			for(SensorData a :mcd.sensors) {
 				 received.add(a);
 			}
-;
+
 			
 		}
 
@@ -85,7 +86,7 @@ public class Mysql_demo {
 
 	public void splitMeasurement() throws SQLException {
 		for (SensorData i : received) {
-			System.out.println(i+"  -----------------------------------------------------------------------antes de enviar");
+			//System.out.println(i+"  -----------------------------------------------------------------------antes de enviar");
 			if (i.sensor.startsWith("T")) {
 				insertMysqlMeasurement(i);
 			}
@@ -99,43 +100,46 @@ public class Mysql_demo {
 	}
 
 	public boolean searchOutliers(SensorData sens) throws SQLException {
-		Statement ps = conn.createStatement();
-		ResultSet r = ps.executeQuery("SELECT * FROM medicao ORDER BY Hora DESC LIMIT 4");
-		BigDecimal average = new BigDecimal("0.00");
-		BigDecimal total = new BigDecimal("0.00");
-		BigDecimal one = new BigDecimal("1.00");
-		BigDecimal oneTen = new BigDecimal("1.2");
-		BigDecimal zeroNine = new BigDecimal("0.80");
-		BigDecimal medicao = new BigDecimal(sens.medicao);
-		BigDecimal averageTop = new BigDecimal("0.00");
-		BigDecimal averageBottom = new BigDecimal("0.00");
-		ArrayList<BigDecimal> lista = new ArrayList<BigDecimal>();
-		while(r.next()) {
-			lista.add(r.getBigDecimal("Leitura"));
-			System.out.println(r.getBigDecimal("Leitura"));
-		}
-		for(BigDecimal i: lista) {
-			average = average.add(i);
-			total.add(one);
-		}
-		
-		if(!average.equals(new BigDecimal("0.00")) && !total.equals(new BigDecimal("0.00"))) {
-			System.out.println(average+"  "+ total);
-			average = average.divide(total,RoundingMode.DOWN);
-			averageTop = average.multiply(oneTen);
-			averageBottom = average.multiply(zeroNine);
-			}
-		
-			if((medicao.compareTo(averageTop) == -1 || medicao.compareTo(averageTop) == 0) && ((medicao.compareTo(averageBottom) == 1) || medicao.compareTo(averageBottom) == 0)) {
-			return false;
-		}
-		
-		if(average==total) {
-			return false;
-		}
-		
-		return true;
-	}
+        Statement ps = conn.createStatement();
+        ResultSet r = ps.executeQuery("SELECT * FROM medicao ORDER BY Hora DESC LIMIT 4");
+        BigDecimal average = new BigDecimal("0.00");
+        BigDecimal total = new BigDecimal("0.00");
+        BigDecimal one = new BigDecimal("1.00");
+        BigDecimal oneTen = new BigDecimal("1.10");
+        BigDecimal zeroNine = new BigDecimal("0.90");
+        BigDecimal medicao = new BigDecimal(sens.medicao);
+        BigDecimal averageTop = new BigDecimal("0.00");
+        BigDecimal averageBottom = new BigDecimal("0.00");
+        ArrayList<BigDecimal> lista = new ArrayList<BigDecimal>();
+        while (r.next()) {
+            lista.add(r.getBigDecimal("Leitura"));
+        }
+        for (BigDecimal i : lista) {
+            average = average.add(i);
+            total = total.add(one);
+        }
+
+        if (calibrar < 4) {
+            calibrar++;
+        } else {
+            if (!average.equals(new BigDecimal("0.00")) && !total.equals(new BigDecimal("0.00"))) {
+                average = average.divide(total, RoundingMode.DOWN);
+                averageTop = average.multiply(oneTen);
+                averageBottom = average.multiply(zeroNine);
+            }
+
+            if ((medicao.compareTo(averageTop) == -1 || medicao.compareTo(averageTop) == 0)
+                    && ((medicao.compareTo(averageBottom) == 1)  || medicao.compareTo(averageBottom) == 0)) {
+                return false;
+            }
+
+            if (average.equals(new BigDecimal("0.00")) && total.equals(new BigDecimal("0.00"))) {
+                return false;
+            }
+            return true;
+        }
+        return false;
+    }
 
 	// fazer os diferentes inserts para as tabelas
 	public void insertMysqlMeasurement(SensorData data) throws SQLException {
@@ -199,22 +203,37 @@ public class Mysql_demo {
 	}
 
 	public boolean checkMysqlDupli(SensorData sens) throws SQLException {
-
-		Statement ps = conn.createStatement();
-		ResultSet r = ps.executeQuery("SELECT Hora FROM medicao ORDER BY Hora LIMIT 1");
-		String a;
-		while (r.next()) {
-			a = r.getTimestamp("Hora").toString();
-			if (sens.data.toString().equals(a)) {
-				return true;
-			}
-		}
-		return false;
-
-	}
+        Statement ps = conn.createStatement();
+        ResultSet r = ps.executeQuery("SELECT Hora FROM medicao ORDER BY Hora DESC LIMIT 2");
+        String a;
+        Timestamp b = new Timestamp(sens.data.getTime());
+        while (r.next()) {
+            a = r.getTimestamp("Hora").toString();
+            if (b.toString().equals(a)) {
+                return true;
+            }
+        }
+        return false;
+    }
 
 	public void checkParameters() {
 		try {
+			int id_medicao = 9999;
+			Statement e= conn.createStatement();
+			ResultSet r2 = e.executeQuery("SELECT * FROM medicao");
+			for (SensorData i : outfree) {
+
+				//meter tudo em timeStamp
+				while(r2.next()) {
+					if (r2.getTimestamp("Hora").equals(i.data)) {
+					id_medicao = Integer.valueOf(r2.getInt("ID_Medicao"));
+						}
+					}
+				
+			}
+			r2.close();
+			
+			
 			Statement ps = conn.createStatement();
 			ResultSet r = ps.executeQuery("SELECT * FROM parametro_cultura");
 			int Limite_Inf_Temp;
@@ -229,8 +248,9 @@ public class Mysql_demo {
 			int Limite_Sup_Critico_Temp;
 			int Limite_Sup_Critico_Luz;
 			int Limite_Sup_Critico_Hum;
-			int Zona;
+			char Zona;
 			int id_cultura;
+			int Zon;
 			while (r.next()) {
 				Limite_Inf_Temp = r.getInt("Limite_Inf_Temp");
 				Limite_Inf_Luz = r.getInt("Limite_Inf_Luz");
@@ -244,112 +264,123 @@ public class Mysql_demo {
 				Limite_Sup_Critico_Temp = r.getInt("Limite_Sup_Critico_Temp");
 				Limite_Sup_Critico_Luz = r.getInt("Limite_Sup_Critico_Luz");
 				Limite_Sup_Critico_Hum = r.getInt("Limite_Sup_Critico_Hum");
-				Zona = r.getInt("ID_Zona");
+				Zon = r.getInt("ID_Zona") ;
+				Zona= (char) (Zon+'0') ;
 				id_cultura = r.getInt("ID_Cultura");
 				for (SensorData i : outfree) {
-					ResultSet r2 = ps.executeQuery("SELECT * FROM medicao");
-					int id_medicao = 9999;
-					//meter tudo em timeStamp
-					while(r2.next()) {
-						if (r2.getTimestamp("Hora").equals(i.data)) {
-						id_medicao = Integer.valueOf(r2.getInt("ID_Medicao"));
-							}
-						}
-					DecimalFormat decimal = new DecimalFormat("#.##");
-					decimal.format(i.medicao);
+
+					DecimalFormat decimal = new DecimalFormat(i.medicao);
+					
 					decimal.setRoundingMode(RoundingMode.DOWN);
 					Timestamp timestamp = new Timestamp(System.currentTimeMillis());
 					Statement stmt = conn.createStatement();
+				//update nao query	
 					String query = "NULL";
+					
 					if (i.sensor.startsWith("T")) {
-						if (Limite_Sup_Temp <= Integer.valueOf(i.medicao)
-								&& Integer.valueOf(i.medicao) <= Limite_Sup_Critico_Temp) {
-							if (Zona == (Integer.valueOf(i.sensor.charAt(i.sensor.length() - 1)))) {
-								query = "INSERT INTO alerta() " + "VALUES(" + timestamp + "," + 0
-										+ ",'ALERTA SUPERIOR do sensor " + i.sensor + " da zona " + i.zona + ".,"
-										+ id_cultura + "," + id_medicao + "," + decimal + ")";
+						if (Limite_Sup_Temp <= Float.valueOf(i.medicao) && Float.valueOf(i.medicao) <= Limite_Sup_Critico_Temp) {
+							System.out.println(Zona+"  "+i.zona.charAt(1));
+							if (Zona ==i.zona.charAt(1) ) {
+								PreparedStatement aler = conn.prepareStatement("INSERT INTO alerta(Hora, Tipo_Alerta, Mensagem, ID_Cultura, ID_Medicao, Leitura ) " + "VALUES('" + timestamp + "','" + 0
+										+ "','ALERTA SUPERIOR do sensor " + i.sensor + " da zona " + i.zona + ".','"
+										+ id_cultura + "','" + id_medicao + "','" + decimal + "')");
+								aler.executeUpdate();
+								System.out.println("escrever");
 							}
-						} else if (Integer.valueOf(i.medicao) >= Limite_Sup_Critico_Temp) {
-							if (Zona == (Integer.valueOf(i.sensor.charAt(i.sensor.length() - 1)))) {
-								query = "INSERT INTO alerta " + "VALUES(" + timestamp + "," + 1
-										+ ",'ALERTA CRÍTICO SUPERIOR do sensor " + i.sensor + " da zona " + i.zona
-										+ ".," + id_cultura + "," + id_medicao + "," + decimal + ")";
+						} else if (Float.valueOf(i.medicao) >= Limite_Sup_Critico_Temp) {
+							System.out.println(Zona+"  "+i.zona.charAt(1));
+							if (Zona==i.zona.charAt(1)) {
+								PreparedStatement aler = conn.prepareStatement("INSERT INTO alerta(Hora, Tipo_Alerta, Mensagem, ID_Cultura, ID_Medicao, Leitura ) " + "VALUES('" + timestamp + "','" + 1
+										+ "','ALERTA CRÍTICO SUPERIOR do sensor " + i.sensor + " da zona " + i.zona
+										+ ".','" + id_cultura + "','" + id_medicao + "','" + decimal + "')");
+								aler.executeUpdate();
+								System.out.println("escrever2");
 							}
-						} else if (Limite_Inf_Temp >= Integer.valueOf(i.medicao)
-								&& Integer.valueOf(i.medicao) >= Limite_Inf_Critico_Temp) {
-							if (Zona == (Integer.valueOf(i.sensor.charAt(i.sensor.length() - 1)))) {
-								query = "INSERT INTO alerta " + "VALUES(" + timestamp + "," + 0
-										+ ",'ALERTA INFERIOR do sensor " + i.sensor + " da zona " + i.zona + ".,"
-										+ id_cultura + "," + id_medicao + "," + decimal + ")";
+						} else if (Limite_Inf_Temp >= Float.valueOf(i.medicao)
+								&& Float.valueOf(i.medicao) >= Limite_Inf_Critico_Temp) {
+							if (Zona==i.zona.charAt(1)) {
+								PreparedStatement aler = conn.prepareStatement("INSERT INTO alerta(Hora, Tipo_Alerta, Mensagem, ID_Cultura, ID_Medicao, Leitura ) " + "VALUES('" + timestamp + "','" + 0
+										+ "','ALERTA INFERIOR do sensor " + i.sensor + " da zona " + i.zona + ".','"
+										+ id_cultura + "','" + id_medicao + "','" + decimal + "')");
+								aler.executeUpdate();
 							}
-						} else if (Integer.valueOf(i.medicao) <= Limite_Inf_Critico_Temp) {
-							if (Zona == (Integer.valueOf(i.sensor.charAt(i.sensor.length() - 1)))) {
-								query = "INSERT INTO alerta " + "VALUES(" + timestamp + "," + 1
-										+ ",'ALERTA CRÍTICO INFERIOR do sensor " + i.sensor + " da zona " + i.zona
-										+ ".," + id_cultura + "," + id_medicao + "," + decimal + ")";
+						} else if (Float.valueOf(i.medicao) <= Limite_Inf_Critico_Temp) {
+							if (Zona==i.zona.charAt(1)) {
+								PreparedStatement aler = conn.prepareStatement("INSERT INTO alerta(Hora, Tipo_Alerta, Mensagem, ID_Cultura, ID_Medicao, Leitura ) " + "VALUES('" + timestamp + "','" + 1
+										+ "','ALERTA CRÍTICO INFERIOR do sensor " + i.sensor + " da zona " + i.zona
+										+ ".','" + id_cultura + "','" + id_medicao + "','" + decimal + "')");
+								aler.executeUpdate();
 							}
 						}
 					}
 					if (i.sensor.startsWith("H")) {
-						if (Limite_Sup_Hum <= Integer.valueOf(i.medicao)
-								&& Integer.valueOf(i.medicao) <= Limite_Sup_Critico_Hum) {
-							if (Zona == (Integer.valueOf(i.sensor.charAt(i.sensor.length() - 1)))) {
-								query = "INSERT INTO alerta " + "VALUES(" + timestamp + "," + 0
-										+ ",'ALERTA SUPERIOR do sensor " + i.sensor + " da zona " + i.zona + ".,"
-										+ id_cultura + "," + id_medicao + "," + decimal + ")";
+						if (Limite_Sup_Hum <= Float.valueOf(i.medicao)
+								&& Float.valueOf(i.medicao) <= Limite_Sup_Critico_Hum) {
+							if (Zona==i.zona.charAt(1)) {
+								PreparedStatement aler = conn.prepareStatement("INSERT INTO alerta(Hora, Tipo_Alerta, Mensagem, ID_Cultura, ID_Medicao, Leitura ) " + "VALUES('" + timestamp + "','" + 0
+										+ "','ALERTA SUPERIOR do sensor " + i.sensor + " da zona " + i.zona + ".','"
+										+ id_cultura + "','" + id_medicao + "','" + decimal + "')");
+								aler.executeUpdate();
 							}
-						} else if (Integer.valueOf(i.medicao) >= Limite_Sup_Critico_Hum) {
-							if (Zona == (Integer.valueOf(i.sensor.charAt(i.sensor.length() - 1)))) {
-								query = "INSERT INTO alerta " + "VALUES(" + timestamp + "," + 1
-										+ ",'ALERTA CRÍTICO SUPERIOR do sensor " + i.sensor + " da zona " + i.zona
-										+ ".," + id_cultura + "," + id_medicao + "," + decimal + ")";
+						} else if (Float.valueOf(i.medicao) >= Limite_Sup_Critico_Hum) {
+							if (Zona ==i.zona.charAt(1)) {
+								PreparedStatement aler = conn.prepareStatement("INSERT INTO alerta(Hora, Tipo_Alerta, Mensagem, ID_Cultura, ID_Medicao, Leitura )  " + "VALUES('" + timestamp + "','" + 1
+										+ "','ALERTA CRÍTICO SUPERIOR do sensor " + i.sensor + " da zona " + i.zona
+										+ ".','" + id_cultura + "','" + id_medicao + "','" + decimal + "')");
+								aler.executeUpdate();
 							}
-						} else if (Limite_Inf_Hum >= Integer.valueOf(i.medicao)
-								&& Integer.valueOf(i.medicao) >= Limite_Inf_Critico_Hum) {
-							if (Zona == (Integer.valueOf(i.sensor.charAt(i.sensor.length() - 1)))) {
-								query = "INSERT INTO alerta " + "VALUES(" + timestamp + "," + 0
-										+ ",'ALERTA INFERIOR do sensor " + i.sensor + " da zona " + i.zona + ".,"
-										+ id_cultura + "," + id_medicao + "," + decimal + ")";
+						} else if (Limite_Inf_Hum >= Float.valueOf(i.medicao)
+								&& Float.valueOf(i.medicao) >= Limite_Inf_Critico_Hum) {
+							if (Zona ==i.zona.charAt(1)) {
+								PreparedStatement aler = conn.prepareStatement("INSERT INTO alerta(Hora, Tipo_Alerta, Mensagem, ID_Cultura, ID_Medicao, Leitura ) " + "VALUES('" + timestamp + "','" + 0
+										+ "','ALERTA INFERIOR do sensor " + i.sensor + " da zona " + i.zona + ".','"
+										+ id_cultura + "','" + id_medicao + "','" + decimal + "')");
+								aler.executeUpdate();
 							}
 
-						} else if (Integer.valueOf(i.medicao) <= Limite_Inf_Critico_Hum) {
-							if (Zona == (Integer.valueOf(i.sensor.charAt(i.sensor.length() - 1)))) {
-								query = "INSERT INTO alerta " + "VALUES(" + timestamp + "," + 1
-										+ ",'ALERTA CRÍTICO INFERIOR do sensor " + i.sensor + " da zona " + i.zona
-										+ ".," + id_cultura + "," + id_medicao + "," + decimal + ")";
+						} else if (Float.valueOf(i.medicao) <= Limite_Inf_Critico_Hum) {
+							if (Zona ==i.zona.charAt(1)) {
+								PreparedStatement aler = conn.prepareStatement("INSERT INTO alerta(Hora, Tipo_Alerta, Mensagem, ID_Cultura, ID_Medicao, Leitura ) " + "VALUES('" + timestamp + "','" + 1
+										+ "','ALERTA CRÍTICO INFERIOR do sensor " + i.sensor + " da zona " + i.zona
+										+ ".','" + id_cultura + "','" + id_medicao + "','" + decimal + "')");
+								aler.executeUpdate();
 							}
 						}
 					}
 					if (i.sensor.startsWith("L")) {
 						if (Limite_Sup_Luz <= Integer.valueOf(i.medicao)
-								&& Integer.valueOf(i.medicao) <= Limite_Sup_Critico_Luz) {
-							if (Zona == (Integer.valueOf(i.sensor.charAt(i.sensor.length() - 1)))) {
-								query = "INSERT INTO alerta " + "VALUES(" + timestamp + "," + 0
-										+ ",'ALERTA SUPERIOR do sensor " + i.sensor + " da zona " + i.zona + ".,"
-										+ id_cultura + "," + id_medicao + "," + decimal + ")";
+								&& Float.valueOf(i.medicao) <= Limite_Sup_Critico_Luz) {
+							if (Zona ==i.zona.charAt(1)) {
+								PreparedStatement aler = conn.prepareStatement("INSERT INTO alerta(Hora, Tipo_Alerta, Mensagem, ID_Cultura, ID_Medicao, Leitura ) " + "VALUES('" + timestamp + "','" + 0
+										+ "','ALERTA SUPERIOR do sensor " + i.sensor + " da zona " + i.zona + ".','"
+										+ id_cultura + "','" + id_medicao + "','" + decimal + "')'");
+								aler.executeUpdate();
 							}
-						} else if (Integer.valueOf(i.medicao) >= Limite_Sup_Critico_Luz) {
-							if (Zona == (Integer.valueOf(i.sensor.charAt(i.sensor.length() - 1)))) {
-								query = "INSERT INTO alerta " + "VALUES(" + timestamp + "," + 1
-										+ ",'ALERTA CRÍTICO SUPERIOR do sensor " + i.sensor + " da zona " + i.zona
-										+ ".," + id_cultura + "," + id_medicao + "," + decimal + ")";
+						} else if (Float.valueOf(i.medicao) >= Limite_Sup_Critico_Luz) {
+							if (Zona ==i.zona.charAt(1)) {
+								PreparedStatement aler = conn.prepareStatement("INSERT INTO alerta(Hora, Tipo_Alerta, Mensagem, ID_Cultura, ID_Medicao, Leitura )  " + "VALUES('" + timestamp + "','" + 1
+										+ "','ALERTA CRÍTICO SUPERIOR do sensor " + i.sensor + " da zona " + i.zona
+										+ ".','" + id_cultura + "','" + id_medicao + "','" + decimal + "')");
+								aler.executeUpdate();
 							}
-						} else if (Limite_Inf_Luz >= Integer.valueOf(i.medicao)
-								&& Integer.valueOf(i.medicao) >= Limite_Inf_Critico_Luz) {
-							if (Zona == (Integer.valueOf(i.sensor.charAt(i.sensor.length() - 1)))) {
-								query = "INSERT INTO alerta " + "VALUES(" + timestamp + "," + 0
-										+ ",'ALERTA INFERIOR do sensor " + i.sensor + " da zona " + i.zona + ".,"
-										+ id_cultura + "," + id_medicao + "," + decimal + ")";
+						} else if (Limite_Inf_Luz >= Float.valueOf(i.medicao)
+								&& Float.valueOf(i.medicao) >= Limite_Inf_Critico_Luz) {
+							if (Zona ==i.zona.charAt(1)) {
+								PreparedStatement aler = conn.prepareStatement("INSERT INTO alerta(Hora, Tipo_Alerta, Mensagem, ID_Cultura, ID_Medicao, Leitura ) " + "VALUES('" + timestamp + "','" + 0
+										+ "','ALERTA INFERIOR do sensor " + i.sensor + " da zona " + i.zona + ".','"
+										+ id_cultura + "','" + id_medicao + "','" + decimal + "')");
+								aler.executeUpdate();
 							}
-						} else if (Integer.valueOf(i.medicao) <= Limite_Inf_Critico_Luz) {
-							if (Zona == (Integer.valueOf(i.sensor.charAt(i.sensor.length() - 1)))) {
-								query = "INSERT INTO alerta " + "VALUES(" + timestamp + "," + 1
-										+ ",'ALERTA CRÍTICO INFERIOR do sensor " + i.sensor + " da zona " + i.zona
-										+ ".," + id_cultura + "," + id_medicao + "," + decimal + ")";
+						} else if (Float.valueOf(i.medicao) <= Limite_Inf_Critico_Luz) {
+							if (Zona ==i.zona.charAt(1)) {
+								PreparedStatement aler = conn.prepareStatement("INSERT INTO alerta(Hora, Tipo_Alerta, Mensagem, ID_Cultura, ID_Medicao, Leitura ) VALUES('" + timestamp + "','" + 1
+										+ "','ALERTA CRÍTICO INFERIOR do sensor " + i.sensor + " da zona " + i.zona
+										+ ".','" + id_cultura + "','" + id_medicao + "','" + decimal + "')");
+								aler.executeUpdate();
 							}
 						}
 					}
-					stmt.executeUpdate(query);
+					
 					
 				}
 			}
