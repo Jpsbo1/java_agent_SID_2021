@@ -4,6 +4,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.sql.*;
 import java.text.DecimalFormat;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
@@ -19,6 +20,7 @@ import com.mongodb.MongoClient;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoDatabase;
 import com.mongodb.client.model.Sorts;
+import com.mysql.cj.protocol.x.SyncFlushDeflaterOutputStream;
 
 public class Mysql_demo {
 	Connection conn = null;
@@ -50,6 +52,7 @@ public class Mysql_demo {
 			// Statement stmt = conn.createStatement();
 			// ps.executeUpdate();
 
+
 		} catch (InstantiationException | IllegalAccessException | ClassNotFoundException | SQLException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
@@ -60,7 +63,7 @@ public class Mysql_demo {
 		while(true) {
 			receive_data();
 			splitMeasurement();
-			checkParameters();
+			//checkParameters();
 			received.clear();
 			outfree.clear();
 		}
@@ -71,8 +74,8 @@ public class Mysql_demo {
 		for (Document doc : coll.find().sort(Sorts.descending("_id"))) {
 			Gson gson = new Gson();
 			MongoLocalDocument mcd = gson.fromJson(doc.toJson(), MongoLocalDocument.class);
-			System.out.println(mcd.sensors);
 			received = (List<SensorData>) mcd.sensors;
+			
 		}
 
 	}
@@ -93,8 +96,8 @@ public class Mysql_demo {
 
 	public boolean searchOutliers(SensorData sens) throws SQLException {
 		Statement ps = conn.createStatement();
-		ResultSet r = ps.executeQuery("SELECT * FROM medicao ORDER BY A DESC LIMIT 10");
-		BigDecimal average = null;
+		ResultSet r = ps.executeQuery("SELECT * FROM medicao ORDER BY Hora DESC LIMIT 10");
+		BigDecimal average = new BigDecimal("0.00");;
 		BigDecimal total = new BigDecimal("0.00");
 		BigDecimal one = new BigDecimal("1.00");
 		BigDecimal oneTen = new BigDecimal("1.10");
@@ -105,46 +108,78 @@ public class Mysql_demo {
 		ArrayList<BigDecimal> lista = new ArrayList<BigDecimal>();
 		while(r.next()) {
 			lista.add(r.getBigDecimal("Leitura"));
+			System.out.println(r.getBigDecimal("Leitura"));
 		}
 		for(BigDecimal i: lista) {
 			average = average.add(i);
 			total.add(one);
 		}
-		average = average.subtract(total);
-		averageTop = average.multiply(oneTen);
-		averageBottom = average.multiply(zeroNine);
+		
+			average = average.subtract(total);
+			averageTop = average.multiply(oneTen);
+			averageBottom = average.multiply(zeroNine);
 		if((medicao.compareTo(averageTop) == -1 || medicao.compareTo(averageTop) == 0) && ((medicao.compareTo(averageBottom) == 1) || medicao.compareTo(averageBottom) == 0)) {
 			return false;
 		}
-		return true;
+		
+		return false;
 	}
 
 	// fazer os diferentes inserts para as tabelas
 	public void insertMysqlMeasurement(SensorData data) throws SQLException {
 		// inserir tb a hora de insersert na taab mysql
+		Timestamp a= new Timestamp(data.data.getTime());
+		SimpleDateFormat formatter = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");  
+        
+        String med_trata;
+        
+        if(data.medicao.length()-1<6) {
+        	String aux=data.medicao;
+        	while(aux.length()-1<6) {
+        		aux=aux.concat("0");
+        		System.out.println(aux);
+        	}
+        	med_trata = aux;
+        	
+        }
+        else {
+        	 med_trata =data.medicao.substring(0, 6);
+        }
+        System.out.println(med_trata);
 		if (data.sensor.startsWith("T")) {
-			if (searchOutliers(data) || checkMysqlDupli(data)) {
+            if (searchOutliers(data) ||checkMysqlDupli(data)) {// 
+				System.out.println(data.sensor+"' , '"+ med_trata.substring(0, 6)+"'  "+data.sensor.charAt(data.sensor.length()-1));
 				PreparedStatement ps = conn
-						.prepareStatement("INSERT INTO medicao(Hora, Tipo, Outlier, Leitura) VALUES (" + data.hora
-								+ ", " + data.sensor + ", " + 1+ ", " + data.medicao + ");");
+						.prepareStatement("INSERT INTO medicao(Hora, Tipo, Outlier, Leitura, ID_Zona) VALUES (' "+ a+ " ' "
+								+ ",' "+ data.sensor +"' , ' "+ 1+ " ' ,  ' "+ med_trata.substring(0, 6) +"'"+ 
+								", ' "+data.sensor.charAt(data.sensor.length()-1) +"' );");
+				
 				ps.executeUpdate();
 			} else {
+				System.out.println(data.sensor+"' , '"+ med_trata.substring(0, 6) +"'  "+data.sensor.charAt(data.sensor.length()-1));
 				PreparedStatement ps = conn
-						.prepareStatement("INSERT INTO medicao(Hora, Tipo, Outlier, Leitura) VALUES (" + data.hora
-								+ ", " + data.sensor + ", " + 0 + ", " + data.medicao + ");");
+						.prepareStatement("INSERT INTO medicao(Hora, Tipo, Outlier, Leitura, ID_Zona) VALUES (' "+ a+ " ' "
+								+ ",' "+ data.sensor +"' , ' "+ 0+ " ' ,  ' "+ med_trata.substring(0, 6) +"'"+ 
+								", ' "+data.sensor.charAt(data.sensor.length()-1) +"' );");
 				ps.executeUpdate();
 				outfree.add(data);
 			}
 		} else {
 			if (checkMysqlDupli(data)) {
+				System.out.println(data.sensor+"' , '"+ med_trata.substring(0, 6) +"'  "+data.sensor.charAt(data.sensor.length()-1));
+				a= new Timestamp(data.data.getTime());
 				PreparedStatement ps = conn
-						.prepareStatement("INSERT INTO medicao(Hora, Tipo, Outlier, Leitura) VALUES (" + data.hora
-								+ ", " + data.sensor + ", " + 1 + ", " + data.medicao + ");");
+						.prepareStatement("INSERT INTO medicao(Hora, Tipo, Outlier, Leitura, ID_Zona) VALUES (' "+ a+ " ' "
+								+ ",' "+ data.sensor +"' , ' "+ 1+ " ' ,  ' "+ med_trata.substring(0, 6) +"'"+ 
+								", ' "+data.sensor.charAt(data.sensor.length()-1) +"' );");
 				ps.executeUpdate();
 			} else {
+				System.out.println(data.sensor+"' , '"+ med_trata.substring(0, 6) +"'  "+data.sensor.charAt(data.sensor.length()-1));
+				a= new Timestamp(data.data.getTime());
 				PreparedStatement ps = conn
-						.prepareStatement("INSERT INTO medicao(Hora, Tipo, Outlier, Leitura) VALUES (" + data.hora
-								+ ", " + data.sensor + ", " + 0 + ", " + data.medicao + ");");
+						.prepareStatement("INSERT INTO medicao(Hora, Tipo, Outlier, Leitura, ID_Zona) VALUES (' "+ a+ " ' "
+								+ ",' "+ data.sensor +"' , ' "+ 0+ " ' ,  ' "+ med_trata.substring(0, 6) +"'"+ 
+								", ' "+data.sensor.charAt(data.sensor.length()-1) +"' );");
 				ps.executeUpdate();
 
 				outfree.add(data);
@@ -216,7 +251,7 @@ public class Mysql_demo {
 						if (Limite_Sup_Temp <= Integer.valueOf(i.medicao)
 								&& Integer.valueOf(i.medicao) <= Limite_Sup_Critico_Temp) {
 							if (Zona == (Integer.valueOf(i.sensor.charAt(i.sensor.length() - 1)))) {
-								query = "INSERT INTO alerta " + "VALUES(" + timestamp + "," + 0
+								query = "INSERT INTO alerta() " + "VALUES(" + timestamp + "," + 0
 										+ ",'ALERTA SUPERIOR do sensor " + i.sensor + " da zona " + i.zona + ".,"
 										+ id_cultura + "," + id_medicao + "," + decimal + ")";
 							}
@@ -311,6 +346,9 @@ public class Mysql_demo {
 
 	public static void main(String[] args) throws SQLException {
 		Mysql_demo demo = new Mysql_demo();
+		demo.mongodbConnection();
+		demo.mysqlConnection();
+
 		demo.start();
 	}
 }
