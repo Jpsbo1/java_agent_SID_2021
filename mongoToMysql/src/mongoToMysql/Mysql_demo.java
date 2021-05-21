@@ -100,15 +100,15 @@ public class Mysql_demo {
 
 	public boolean searchOutliers(SensorData sens) throws SQLException {
 		Statement ps = conn.createStatement();
-		ResultSet r = ps.executeQuery("SELECT * FROM medicao ORDER BY Hora DESC LIMIT 10");
-		BigDecimal average = new BigDecimal("0.00");;
+		ResultSet r = ps.executeQuery("SELECT * FROM medicao ORDER BY Hora DESC LIMIT 4");
+		BigDecimal average = new BigDecimal("0.00");
 		BigDecimal total = new BigDecimal("0.00");
 		BigDecimal one = new BigDecimal("1.00");
-		BigDecimal oneTen = new BigDecimal("1.10");
-		BigDecimal zeroNine = new BigDecimal("0.90");
+		BigDecimal oneTen = new BigDecimal("1.2");
+		BigDecimal zeroNine = new BigDecimal("0.80");
 		BigDecimal medicao = new BigDecimal(sens.medicao);
-		BigDecimal averageTop = null;
-		BigDecimal averageBottom = null;
+		BigDecimal averageTop = new BigDecimal("0.00");
+		BigDecimal averageBottom = new BigDecimal("0.00");
 		ArrayList<BigDecimal> lista = new ArrayList<BigDecimal>();
 		while(r.next()) {
 			lista.add(r.getBigDecimal("Leitura"));
@@ -119,14 +119,22 @@ public class Mysql_demo {
 			total.add(one);
 		}
 		
-			average = average.subtract(total);
+		if(!average.equals(new BigDecimal("0.00")) && !total.equals(new BigDecimal("0.00"))) {
+			System.out.println(average+"  "+ total);
+			average = average.divide(total,RoundingMode.DOWN);
 			averageTop = average.multiply(oneTen);
 			averageBottom = average.multiply(zeroNine);
-		if((medicao.compareTo(averageTop) == -1 || medicao.compareTo(averageTop) == 0) && ((medicao.compareTo(averageBottom) == 1) || medicao.compareTo(averageBottom) == 0)) {
+			}
+		
+			if((medicao.compareTo(averageTop) == -1 || medicao.compareTo(averageTop) == 0) && ((medicao.compareTo(averageBottom) == 1) || medicao.compareTo(averageBottom) == 0)) {
 			return false;
 		}
 		
-		return false;
+		if(average==total) {
+			return false;
+		}
+		
+		return true;
 	}
 
 	// fazer os diferentes inserts para as tabelas
@@ -150,7 +158,7 @@ public class Mysql_demo {
         }
       
 		if (data.sensor.startsWith("T")) {
-            if (searchOutliers(data) ||checkMysqlDupli(data)) {// 
+            if (searchOutliers(data)  ){// || checkMysqlDupli(data)
 				System.out.println(data.sensor+"' , '"+ med_trata.substring(0, 6)+"'  "+data.sensor.charAt(data.sensor.length()-1));
 				PreparedStatement ps = conn
 						.prepareStatement("INSERT INTO medicao(Hora, Tipo, Outlier, Leitura, ID_Zona) VALUES (' "+ a+ " ' "
@@ -236,14 +244,17 @@ public class Mysql_demo {
 				Limite_Sup_Critico_Temp = r.getInt("Limite_Sup_Critico_Temp");
 				Limite_Sup_Critico_Luz = r.getInt("Limite_Sup_Critico_Luz");
 				Limite_Sup_Critico_Hum = r.getInt("Limite_Sup_Critico_Hum");
-				Zona = r.getInt("Zona");
+				Zona = r.getInt("ID_Zona");
 				id_cultura = r.getInt("ID_Cultura");
 				for (SensorData i : outfree) {
 					ResultSet r2 = ps.executeQuery("SELECT * FROM medicao");
 					int id_medicao = 9999;
-					if (r2.getTimestamp("Hora").equals(i.data)) {
+					//meter tudo em timeStamp
+					while(r2.next()) {
+						if (r2.getTimestamp("Hora").equals(i.data)) {
 						id_medicao = Integer.valueOf(r2.getInt("ID_Medicao"));
-					}
+							}
+						}
 					DecimalFormat decimal = new DecimalFormat("#.##");
 					decimal.format(i.medicao);
 					decimal.setRoundingMode(RoundingMode.DOWN);
@@ -339,6 +350,7 @@ public class Mysql_demo {
 						}
 					}
 					stmt.executeUpdate(query);
+					
 				}
 			}
 		} catch (SQLException e) {
