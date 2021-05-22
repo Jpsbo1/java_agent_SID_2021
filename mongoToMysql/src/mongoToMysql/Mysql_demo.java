@@ -114,7 +114,11 @@ public class Mysql_demo {
 		BigDecimal averageBottom = new BigDecimal("0.00");
 		ArrayList<BigDecimal> lista = new ArrayList<BigDecimal>();
 		while (r.next()) {
-			lista.add(r.getBigDecimal("Leitura"));
+			if (r.getInt("ID_Zona") == Integer.valueOf(sens.zona.split("")[1])
+					&& r.getString("Tipo").equals(sens.sensor)) {
+
+				lista.add(r.getBigDecimal("Leitura"));
+			}
 		}
 		for (BigDecimal i : lista) {
 			average = average.add(i);
@@ -168,16 +172,16 @@ public class Mysql_demo {
 				// "+data.sensor.charAt(data.sensor.length()-1));
 				PreparedStatement ps = conn
 						.prepareStatement("INSERT INTO medicao(Hora, Tipo, Outlier, Leitura, ID_Zona) VALUES (' " + a
-								+ " ' " + ",' " + data.sensor + "' , ' " + 1 + " ' ,  ' " + med_trata.substring(0, 6)
+								+ " ' " + ",'" + data.sensor.charAt(0) + "' , ' " + 1 + " ' ,  ' " + med_trata.substring(0, 6)
 								+ "'" + ", ' " + data.sensor.charAt(data.sensor.length() - 1) + "' );");
 
 				ps.executeUpdate();
 			} else {
-				// System.out.println("n„o e out "+data.sensor+"' , '"+ med_trata.substring(0,
+				// System.out.println("n√£o e out "+data.sensor+"' , '"+ med_trata.substring(0,
 				// 6) +"' "+data.sensor.charAt(data.sensor.length()-1));
 				PreparedStatement ps = conn
 						.prepareStatement("INSERT INTO medicao(Hora, Tipo, Outlier, Leitura, ID_Zona) VALUES (' " + a
-								+ " ' " + ",' " + data.sensor + "' , ' " + 0 + " ' ,  ' " + med_trata.substring(0, 6)
+								+ " ' " + ",'" + data.sensor.charAt(0) + "' , ' " + 0 + " ' ,  ' " + med_trata.substring(0, 6)
 								+ "'" + ", ' " + data.sensor.charAt(data.sensor.length() - 1) + "' );");
 				ps.executeUpdate();
 				outfree.add(data);
@@ -189,7 +193,7 @@ public class Mysql_demo {
 				a = new Timestamp(data.data.getTime());
 				PreparedStatement ps = conn
 						.prepareStatement("INSERT INTO medicao(Hora, Tipo, Outlier, Leitura, ID_Zona) VALUES (' " + a
-								+ " ' " + ",' " + data.sensor + "' , ' " + 1 + " ' ,  ' " + med_trata.substring(0, 6)
+								+ " ' " + ",'" + data.sensor.charAt(0) + "' , ' " + 1 + " ' ,  ' " + med_trata.substring(0, 6)
 								+ "'" + ", ' " + data.sensor.charAt(data.sensor.length() - 1) + "' );");
 				ps.executeUpdate();
 			} else {
@@ -198,7 +202,7 @@ public class Mysql_demo {
 				a = new Timestamp(data.data.getTime());
 				PreparedStatement ps = conn
 						.prepareStatement("INSERT INTO medicao(Hora, Tipo, Outlier, Leitura, ID_Zona) VALUES (' " + a
-								+ " ' " + ",' " + data.sensor + "' , ' " + 0 + " ' ,  ' " + med_trata.substring(0, 6)
+								+ " ' " + ",'" + data.sensor.charAt(0) + "' , ' " + 0 + " ' ,  ' " + med_trata.substring(0, 6)
 								+ "'" + ", ' " + data.sensor.charAt(data.sensor.length() - 1) + "' );");
 				ps.executeUpdate();
 
@@ -232,7 +236,7 @@ public class Mysql_demo {
 				while (r2.next()) {
 					a = new Timestamp(r2.getTimestamp("Hora").getTime());
 					Timestamp b = new Timestamp(i.data.getTime());
-					if (a.equals(b) && r2.getString("Tipo").equals(" "+i.sensor)) {
+					if (a.equals(b) && r2.getString("Tipo").equals(" " + i.sensor)) {
 						id_medicao = Integer.valueOf(r2.getInt("ID_Medicao"));
 					}
 				}
@@ -276,7 +280,7 @@ public class Mysql_demo {
 				for (SensorData i : outfree) {
 
 					BigDecimal decimal = new BigDecimal(i.medicao);
-					//---------------------------------------------------------------------------------------------------------------------------
+					// ---------------------------------------------------------------------------------------------------------------------------
 					Statement stmt = conn.createStatement();
 					String query = "NULL";
 
@@ -289,10 +293,9 @@ public class Mysql_demo {
 								if (Zona == i.zona.charAt(1)) {
 									PreparedStatement aler = conn.prepareStatement(
 											"INSERT INTO alerta(Hora, Tipo_Alerta, Mensagem, ID_Cultura, ID_Medicao, Leitura ) "
-													+ "VALUES('" + a + "','" + 0
-													+ "','ALERTA SUPERIOR do sensor " + i.sensor + " da zona " + i.zona
-													+ ".','" + id_cultura + "','" + id_medicao + "','" + decimal
-													+ "')");
+													+ "VALUES('" + a + "','" + 0 + "','ALERTA SUPERIOR do sensor "
+													+ i.sensor + " da zona " + i.zona + ".','" + id_cultura + "','"
+													+ id_medicao + "','" + decimal + "')");
 									aler.executeUpdate();
 									// System.out.println("escrever");
 								}
@@ -316,10 +319,9 @@ public class Mysql_demo {
 								if (Zona == i.zona.charAt(1)) {
 									PreparedStatement aler = conn.prepareStatement(
 											"INSERT INTO alerta(Hora, Tipo_Alerta, Mensagem, ID_Cultura, ID_Medicao, Leitura ) "
-													+ "VALUES('" + a + "','" + 0
-													+ "','ALERTA INFERIOR do sensor " + i.sensor + " da zona " + i.zona
-													+ ".','" + id_cultura + "','" + id_medicao + "','" + decimal
-													+ "')");
+													+ "VALUES('" + a + "','" + 0 + "','ALERTA INFERIOR do sensor "
+													+ i.sensor + " da zona " + i.zona + ".','" + id_cultura + "','"
+													+ id_medicao + "','" + decimal + "')");
 									aler.executeUpdate();
 								}
 							} else if (Float.valueOf(i.medicao) <= Limite_Inf_Critico_Temp) {
@@ -343,10 +345,9 @@ public class Mysql_demo {
 								if (Zona == i.zona.charAt(1)) {
 									PreparedStatement aler = conn.prepareStatement(
 											"INSERT INTO alerta(Hora, Tipo_Alerta, Mensagem, ID_Cultura, ID_Medicao, Leitura ) "
-													+ "VALUES('" + a + "','" + 0
-													+ "','ALERTA SUPERIOR do sensor " + i.sensor + " da zona " + i.zona
-													+ ".','" + id_cultura + "','" + id_medicao + "','" + decimal
-													+ "')");
+													+ "VALUES('" + a + "','" + 0 + "','ALERTA SUPERIOR do sensor "
+													+ i.sensor + " da zona " + i.zona + ".','" + id_cultura + "','"
+													+ id_medicao + "','" + decimal + "')");
 									aler.executeUpdate();
 								}
 							} else if (Float.valueOf(i.medicao) >= Limite_Sup_Critico_Hum) {
@@ -368,10 +369,9 @@ public class Mysql_demo {
 								if (Zona == i.zona.charAt(1)) {
 									PreparedStatement aler = conn.prepareStatement(
 											"INSERT INTO alerta(Hora, Tipo_Alerta, Mensagem, ID_Cultura, ID_Medicao, Leitura ) "
-													+ "VALUES('" + a + "','" + 0
-													+ "','ALERTA INFERIOR do sensor " + i.sensor + " da zona " + i.zona
-													+ ".','" + id_cultura + "','" + id_medicao + "','" + decimal
-													+ "')");
+													+ "VALUES('" + a + "','" + 0 + "','ALERTA INFERIOR do sensor "
+													+ i.sensor + " da zona " + i.zona + ".','" + id_cultura + "','"
+													+ id_medicao + "','" + decimal + "')");
 									aler.executeUpdate();
 								}
 
@@ -396,10 +396,9 @@ public class Mysql_demo {
 								if (Zona == i.zona.charAt(1)) {
 									PreparedStatement aler = conn.prepareStatement(
 											"INSERT INTO alerta(Hora, Tipo_Alerta, Mensagem, ID_Cultura, ID_Medicao, Leitura ) "
-													+ "VALUES('" + a + "','" + 0
-													+ "','ALERTA SUPERIOR do sensor " + i.sensor + " da zona " + i.zona
-													+ ".','" + id_cultura + "','" + id_medicao + "','" + decimal
-													+ "')'");
+													+ "VALUES('" + a + "','" + 0 + "','ALERTA SUPERIOR do sensor "
+													+ i.sensor + " da zona " + i.zona + ".','" + id_cultura + "','"
+													+ id_medicao + "','" + decimal + "')'");
 									aler.executeUpdate();
 								}
 							} else if (Float.valueOf(i.medicao) >= Limite_Sup_Critico_Luz) {
@@ -421,10 +420,9 @@ public class Mysql_demo {
 								if (Zona == i.zona.charAt(1)) {
 									PreparedStatement aler = conn.prepareStatement(
 											"INSERT INTO alerta(Hora, Tipo_Alerta, Mensagem, ID_Cultura, ID_Medicao, Leitura ) "
-													+ "VALUES('" + a + "','" + 0
-													+ "','ALERTA INFERIOR do sensor " + i.sensor + " da zona " + i.zona
-													+ ".','" + id_cultura + "','" + id_medicao + "','" + decimal
-													+ "')");
+													+ "VALUES('" + a + "','" + 0 + "','ALERTA INFERIOR do sensor "
+													+ i.sensor + " da zona " + i.zona + ".','" + id_cultura + "','"
+													+ id_medicao + "','" + decimal + "')");
 									aler.executeUpdate();
 								}
 							} else if (Float.valueOf(i.medicao) <= Limite_Inf_Critico_Luz) {
@@ -433,9 +431,9 @@ public class Mysql_demo {
 								if (Zona == i.zona.charAt(1)) {
 									PreparedStatement aler = conn.prepareStatement(
 											"INSERT INTO alerta(Hora, Tipo_Alerta, Mensagem, ID_Cultura, ID_Medicao, Leitura ) VALUES('"
-													+ a + "','" + 1 + "','ALERTA CRÕTICO INFERIOR do sensor "
-													+ i.sensor + " da zona " + i.zona + ".','" + id_cultura + "','"
-													+ id_medicao + "','" + decimal + "')");
+													+ a + "','" + 1 + "','ALERTA CRÕTICO INFERIOR do sensor " + i.sensor
+													+ " da zona " + i.zona + ".','" + id_cultura + "','" + id_medicao
+													+ "','" + decimal + "')");
 									aler.executeUpdate();
 								}
 							}
