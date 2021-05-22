@@ -115,8 +115,7 @@ public class Mysql_demo {
 		ArrayList<BigDecimal> lista = new ArrayList<BigDecimal>();
 		while (r.next()) {
 			if (r.getInt("ID_Zona") == Integer.valueOf(sens.zona.split("")[1])
-					&& r.getString("Tipo").equals(sens.sensor)) {
-
+					&& r.getString("Tipo").equals(sens.sensor.split("")[0])) {
 				lista.add(r.getBigDecimal("Leitura"));
 			}
 		}
@@ -170,19 +169,19 @@ public class Mysql_demo {
 			if (searchOutliers(data) || checkMysqlDupli(data)) {
 				// System.out.println(data.sensor+"' , '"+ med_trata.substring(0, 6)+"'
 				// "+data.sensor.charAt(data.sensor.length()-1));
-				PreparedStatement ps = conn
-						.prepareStatement("INSERT INTO medicao(Hora, Tipo, Outlier, Leitura, ID_Zona) VALUES (' " + a
-								+ " ' " + ",'" + data.sensor.charAt(0) + "' , ' " + 1 + " ' ,  ' " + med_trata.substring(0, 6)
-								+ "'" + ", ' " + data.sensor.charAt(data.sensor.length() - 1) + "' );");
+				PreparedStatement ps = conn.prepareStatement(
+						"INSERT INTO medicao(Hora, Tipo, Outlier, Leitura, ID_Zona) VALUES (' " + a + " ' " + ",'"
+								+ data.sensor.charAt(0) + "' , ' " + 1 + " ' ,  ' " + med_trata.substring(0, 6) + "'"
+								+ ", ' " + data.sensor.charAt(data.sensor.length() - 1) + "' );");
 
 				ps.executeUpdate();
 			} else {
 				// System.out.println("não e out "+data.sensor+"' , '"+ med_trata.substring(0,
 				// 6) +"' "+data.sensor.charAt(data.sensor.length()-1));
-				PreparedStatement ps = conn
-						.prepareStatement("INSERT INTO medicao(Hora, Tipo, Outlier, Leitura, ID_Zona) VALUES (' " + a
-								+ " ' " + ",'" + data.sensor.charAt(0) + "' , ' " + 0 + " ' ,  ' " + med_trata.substring(0, 6)
-								+ "'" + ", ' " + data.sensor.charAt(data.sensor.length() - 1) + "' );");
+				PreparedStatement ps = conn.prepareStatement(
+						"INSERT INTO medicao(Hora, Tipo, Outlier, Leitura, ID_Zona) VALUES (' " + a + " ' " + ",'"
+								+ data.sensor.charAt(0) + "' , ' " + 0 + " ' ,  ' " + med_trata.substring(0, 6) + "'"
+								+ ", ' " + data.sensor.charAt(data.sensor.length() - 1) + "' );");
 				ps.executeUpdate();
 				outfree.add(data);
 			}
@@ -191,19 +190,19 @@ public class Mysql_demo {
 				// System.out.println(data.sensor+"' , '"+ med_trata.substring(0, 6) +"'
 				// "+data.sensor.charAt(data.sensor.length()-1));
 				a = new Timestamp(data.data.getTime());
-				PreparedStatement ps = conn
-						.prepareStatement("INSERT INTO medicao(Hora, Tipo, Outlier, Leitura, ID_Zona) VALUES (' " + a
-								+ " ' " + ",'" + data.sensor.charAt(0) + "' , ' " + 1 + " ' ,  ' " + med_trata.substring(0, 6)
-								+ "'" + ", ' " + data.sensor.charAt(data.sensor.length() - 1) + "' );");
+				PreparedStatement ps = conn.prepareStatement(
+						"INSERT INTO medicao(Hora, Tipo, Outlier, Leitura, ID_Zona) VALUES (' " + a + " ' " + ",'"
+								+ data.sensor.charAt(0) + "' , ' " + 1 + " ' ,  ' " + med_trata.substring(0, 6) + "'"
+								+ ", ' " + data.sensor.charAt(data.sensor.length() - 1) + "' );");
 				ps.executeUpdate();
 			} else {
 				// System.out.println(data.sensor+"' , '"+ med_trata.substring(0, 6) +"'
 				// "+data.sensor.charAt(data.sensor.length()-1));
 				a = new Timestamp(data.data.getTime());
-				PreparedStatement ps = conn
-						.prepareStatement("INSERT INTO medicao(Hora, Tipo, Outlier, Leitura, ID_Zona) VALUES (' " + a
-								+ " ' " + ",'" + data.sensor.charAt(0) + "' , ' " + 0 + " ' ,  ' " + med_trata.substring(0, 6)
-								+ "'" + ", ' " + data.sensor.charAt(data.sensor.length() - 1) + "' );");
+				PreparedStatement ps = conn.prepareStatement(
+						"INSERT INTO medicao(Hora, Tipo, Outlier, Leitura, ID_Zona) VALUES (' " + a + " ' " + ",'"
+								+ data.sensor.charAt(0) + "' , ' " + 0 + " ' ,  ' " + med_trata.substring(0, 6) + "'"
+								+ ", ' " + data.sensor.charAt(data.sensor.length() - 1) + "' );");
 				ps.executeUpdate();
 
 				outfree.add(data);
@@ -213,12 +212,13 @@ public class Mysql_demo {
 
 	public boolean checkMysqlDupli(SensorData sens) throws SQLException {
 		Statement ps = conn.createStatement();
-		ResultSet r = ps.executeQuery("SELECT Hora FROM medicao ORDER BY Hora DESC LIMIT 2");
+		ResultSet r = ps.executeQuery("SELECT * FROM medicao ORDER BY Hora DESC LIMIT 5");
 		String a;
 		Timestamp b = new Timestamp(sens.data.getTime());
 		while (r.next()) {
 			a = r.getTimestamp("Hora").toString();
-			if (b.toString().equals(a)) {
+			if (b.toString().equals(a) && r.getString("Tipo").equals(sens.sensor)
+					&& r.getInt("ID_Zona") == Integer.valueOf(sens.zona.split("")[1])) {
 				return true;
 			}
 		}
@@ -236,8 +236,10 @@ public class Mysql_demo {
 				while (r2.next()) {
 					a = new Timestamp(r2.getTimestamp("Hora").getTime());
 					Timestamp b = new Timestamp(i.data.getTime());
-					if (a.equals(b) && r2.getString("Tipo").equals(" " + i.sensor)) {
+					if (a.equals(b) && (r2.getInt("ID_Zona") == Integer.valueOf(sens.zona.split("")[1])
+							&& r2.getString("Tipo").equals(sens.sensor.split("")[0]))) {
 						id_medicao = Integer.valueOf(r2.getInt("ID_Medicao"));
+						System.out.println("Entrou");
 					}
 				}
 
@@ -310,7 +312,7 @@ public class Mysql_demo {
 													+ i.zona + ".','" + id_cultura + "','" + id_medicao + "','"
 													+ decimal + "')");
 									aler.executeUpdate();
-									System.out.println("escrever2");
+									// System.out.println("escrever2");
 								}
 							} else if (Limite_Inf_Temp >= Float.valueOf(i.medicao)
 									&& Float.valueOf(i.medicao) >= Limite_Inf_Critico_Temp) {
