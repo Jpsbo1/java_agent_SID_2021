@@ -61,7 +61,7 @@ public class Mysql_demo {
 		while(true) {
 			receive_data();
 			splitMeasurement();
-			checkParameters();
+			
 			received.clear();
 			outfree.clear();
 			Thread.sleep(1000);
@@ -89,12 +89,15 @@ public class Mysql_demo {
 			//System.out.println(i+"  -----------------------------------------------------------------------antes de enviar");
 			if (i.sensor.startsWith("T")) {
 				insertMysqlMeasurement(i);
+				checkParameters();
 			}
 			if (i.sensor.startsWith("H")) {
 				insertMysqlMeasurement(i);
+				checkParameters();
 			}
 			if (i.sensor.startsWith("L")) {
 				insertMysqlMeasurement(i);
+				checkParameters();
 			}
 		}
 	}
@@ -162,7 +165,7 @@ public class Mysql_demo {
         }
       
 		if (data.sensor.startsWith("T")) {
-            if (searchOutliers(data)  ){// || checkMysqlDupli(data)
+            if (searchOutliers(data) || checkMysqlDupli(data) ){
 				System.out.println(data.sensor+"' , '"+ med_trata.substring(0, 6)+"'  "+data.sensor.charAt(data.sensor.length()-1));
 				PreparedStatement ps = conn
 						.prepareStatement("INSERT INTO medicao(Hora, Tipo, Outlier, Leitura, ID_Zona) VALUES (' "+ a+ " ' "
@@ -180,7 +183,7 @@ public class Mysql_demo {
 				outfree.add(data);
 			}
 		} else {
-			if (checkMysqlDupli(data)) {
+			if (checkMysqlDupli(data)|| Float.valueOf(med_trata)<0) {
 				System.out.println(data.sensor+"' , '"+ med_trata.substring(0, 6) +"'  "+data.sensor.charAt(data.sensor.length()-1));
 				a= new Timestamp(data.data.getTime());
 				PreparedStatement ps = conn
@@ -221,11 +224,12 @@ public class Mysql_demo {
 			int id_medicao = 9999;
 			Statement e= conn.createStatement();
 			ResultSet r2 = e.executeQuery("SELECT * FROM medicao");
-			for (SensorData i : outfree) {
+			
 
-				//meter tudo em timeStamp
+			for (SensorData i : outfree) {
 				while(r2.next()) {
-					if (r2.getTimestamp("Hora").equals(i.data)) {
+					Timestamp b = new Timestamp(i.data.getTime());
+					if (r2.getTimestamp("Hora").toString().equals(b.toString())) {
 					id_medicao = Integer.valueOf(r2.getInt("ID_Medicao"));
 						}
 					}
@@ -269,9 +273,7 @@ public class Mysql_demo {
 				id_cultura = r.getInt("ID_Cultura");
 				for (SensorData i : outfree) {
 
-					DecimalFormat decimal = new DecimalFormat(i.medicao);
-					
-					decimal.setRoundingMode(RoundingMode.DOWN);
+					BigDecimal decimal = new BigDecimal(i.medicao);
 					Timestamp timestamp = new Timestamp(System.currentTimeMillis());
 					Statement stmt = conn.createStatement();
 				//update nao query	
@@ -314,8 +316,7 @@ public class Mysql_demo {
 						}
 					}
 					if (i.sensor.startsWith("H")) {
-						if (Limite_Sup_Hum <= Float.valueOf(i.medicao)
-								&& Float.valueOf(i.medicao) <= Limite_Sup_Critico_Hum) {
+						if (Limite_Sup_Hum <= Float.valueOf(i.medicao)&& Float.valueOf(i.medicao) <= Limite_Sup_Critico_Hum) {
 							if (Zona==i.zona.charAt(1)) {
 								PreparedStatement aler = conn.prepareStatement("INSERT INTO alerta(Hora, Tipo_Alerta, Mensagem, ID_Cultura, ID_Medicao, Leitura ) " + "VALUES('" + timestamp + "','" + 0
 										+ "','ALERTA SUPERIOR do sensor " + i.sensor + " da zona " + i.zona + ".','"
@@ -348,7 +349,7 @@ public class Mysql_demo {
 						}
 					}
 					if (i.sensor.startsWith("L")) {
-						if (Limite_Sup_Luz <= Integer.valueOf(i.medicao)
+						if (Limite_Sup_Luz <= Float.valueOf(i.medicao)
 								&& Float.valueOf(i.medicao) <= Limite_Sup_Critico_Luz) {
 							if (Zona ==i.zona.charAt(1)) {
 								PreparedStatement aler = conn.prepareStatement("INSERT INTO alerta(Hora, Tipo_Alerta, Mensagem, ID_Cultura, ID_Medicao, Leitura ) " + "VALUES('" + timestamp + "','" + 0
