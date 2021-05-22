@@ -22,7 +22,6 @@ import com.mongodb.client.MongoDatabase;
 import com.mongodb.client.model.Sorts;
 import com.mysql.cj.protocol.x.SyncFlushDeflaterOutputStream;
 
-
 public class Mysql_demo {
 	Connection conn = null;
 	MongoClient mongoC;
@@ -30,7 +29,8 @@ public class Mysql_demo {
 	MongoCollection<Document> coll;
 	public List<SensorData> received = new ArrayList<>();
 	public List<SensorData> outfree = new ArrayList<>();
-	private int calibrar=0;
+	private int calibrar = 0;
+
 	public void mongodbConnection() {
 
 		mongoC = new MongoClient("localhost", 27017);
@@ -49,8 +49,6 @@ public class Mysql_demo {
 			Class.forName(driver).newInstance();
 			conn = DriverManager.getConnection(url + dbName, userName, password);
 
-
-
 		} catch (InstantiationException | IllegalAccessException | ClassNotFoundException | SQLException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
@@ -58,10 +56,10 @@ public class Mysql_demo {
 	}
 
 	public void start() throws SQLException, InterruptedException {
-		while(true) {
+		while (true) {
 			receive_data();
 			splitMeasurement();
-			
+
 			received.clear();
 			outfree.clear();
 			Thread.sleep(1000);
@@ -70,134 +68,138 @@ public class Mysql_demo {
 	}
 
 	public void receive_data() {
-		
+
 		for (Document doc : coll.find().sort(Sorts.descending("_id")).limit(1)) {
 			Gson gson = new Gson();
 			MongoLocalDocument mcd = gson.fromJson(doc.toJson(), MongoLocalDocument.class);
-			
-			for(SensorData a :mcd.sensors) {
-				 received.add(a);
+
+			for (SensorData a : mcd.sensors) {
+				received.add(a);
 			}
 
-			
 		}
 
 	}
 
 	public void splitMeasurement() throws SQLException {
 		for (SensorData i : received) {
-			//System.out.println(i+"  -----------------------------------------------------------------------antes de enviar");
+			// System.out.println(i+"
+			// -----------------------------------------------------------------------antes
+			// de enviar");
 			if (i.sensor.startsWith("T")) {
 				insertMysqlMeasurement(i);
-				checkParameters();
+				checkParameters(i);
 			}
 			if (i.sensor.startsWith("H")) {
 				insertMysqlMeasurement(i);
-				checkParameters();
+				checkParameters(i);
 			}
 			if (i.sensor.startsWith("L")) {
 				insertMysqlMeasurement(i);
-				checkParameters();
+				checkParameters(i);
 			}
 		}
 	}
 
 	public boolean searchOutliers(SensorData sens) throws SQLException {
-        Statement ps = conn.createStatement();
-        ResultSet r = ps.executeQuery("SELECT * FROM medicao ORDER BY Hora DESC LIMIT 4");
-        BigDecimal average = new BigDecimal("0.00");
-        BigDecimal total = new BigDecimal("0.00");
-        BigDecimal one = new BigDecimal("1.00");
-        BigDecimal oneTen = new BigDecimal("1.10");
-        BigDecimal zeroNine = new BigDecimal("0.90");
-        BigDecimal medicao = new BigDecimal(sens.medicao);
-        BigDecimal averageTop = new BigDecimal("0.00");
-        BigDecimal averageBottom = new BigDecimal("0.00");
-        ArrayList<BigDecimal> lista = new ArrayList<BigDecimal>();
-        while (r.next()) {
-            lista.add(r.getBigDecimal("Leitura"));
-        }
-        for (BigDecimal i : lista) {
-            average = average.add(i);
-            total = total.add(one);
-        }
+		Statement ps = conn.createStatement();
+		ResultSet r = ps.executeQuery("SELECT * FROM medicao ORDER BY Hora DESC LIMIT 4");
+		BigDecimal average = new BigDecimal("0.00");
+		BigDecimal total = new BigDecimal("0.00");
+		BigDecimal one = new BigDecimal("1.00");
+		BigDecimal oneTen = new BigDecimal("1.10");
+		BigDecimal zeroNine = new BigDecimal("0.90");
+		BigDecimal medicao = new BigDecimal(sens.medicao);
+		BigDecimal averageTop = new BigDecimal("0.00");
+		BigDecimal averageBottom = new BigDecimal("0.00");
+		ArrayList<BigDecimal> lista = new ArrayList<BigDecimal>();
+		while (r.next()) {
+			lista.add(r.getBigDecimal("Leitura"));
+		}
+		for (BigDecimal i : lista) {
+			average = average.add(i);
+			total = total.add(one);
+		}
 
-        if (calibrar < 4) {
-            calibrar++;
-        } else {
-            if (!average.equals(new BigDecimal("0.00")) && !total.equals(new BigDecimal("0.00"))) {
-                average = average.divide(total, RoundingMode.DOWN);
-                averageTop = average.multiply(oneTen);
-                averageBottom = average.multiply(zeroNine);
-            }
+		if (calibrar < 4) {
+			calibrar++;
+		} else {
+			if (!average.equals(new BigDecimal("0.00")) && !total.equals(new BigDecimal("0.00"))) {
+				average = average.divide(total, RoundingMode.DOWN);
+				averageTop = average.multiply(oneTen);
+				averageBottom = average.multiply(zeroNine);
+			}
 
-            if ((medicao.compareTo(averageTop) == -1 || medicao.compareTo(averageTop) == 0)
-                    && ((medicao.compareTo(averageBottom) == 1)  || medicao.compareTo(averageBottom) == 0)) {
-                return false;
-            }
+			if ((medicao.compareTo(averageTop) == -1 || medicao.compareTo(averageTop) == 0)
+					&& ((medicao.compareTo(averageBottom) == 1) || medicao.compareTo(averageBottom) == 0)) {
+				return false;
+			}
 
-            if (average.equals(new BigDecimal("0.00")) && total.equals(new BigDecimal("0.00"))) {
-                return false;
-            }
-            return true;
-        }
-        return false;
-    }
+			if (average.equals(new BigDecimal("0.00")) && total.equals(new BigDecimal("0.00"))) {
+				return false;
+			}
+			return true;
+		}
+		return false;
+	}
 
 	// fazer os diferentes inserts para as tabelas
 	public void insertMysqlMeasurement(SensorData data) throws SQLException {
 		// inserir tb a hora de insersert na taab mysql
-		Timestamp a= new Timestamp(data.data.getTime());
-		SimpleDateFormat formatter = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");  
-        
-        String med_trata;
-        
-        if(data.medicao.length()-1<6) {
-        	String aux=data.medicao;
-        	while(aux.length()-1<6) {
-        		aux=aux.concat("0");
-        	}
-        	med_trata = aux;
-        	
-        }
-        else {
-        	 med_trata =data.medicao.substring(0, 6);
-        }
-      
+		Timestamp a = new Timestamp(data.data.getTime());
+		SimpleDateFormat formatter = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+
+		String med_trata;
+
+		if (data.medicao.length() - 1 < 6) {
+			String aux = data.medicao;
+			while (aux.length() - 1 < 6) {
+				aux = aux.concat("0");
+			}
+			med_trata = aux;
+
+		} else {
+			med_trata = data.medicao.substring(0, 6);
+		}
+
 		if (data.sensor.startsWith("T")) {
-            if (searchOutliers(data) || checkMysqlDupli(data) ){
-				//System.out.println(data.sensor+"' , '"+ med_trata.substring(0, 6)+"'  "+data.sensor.charAt(data.sensor.length()-1));
+			if (searchOutliers(data) || checkMysqlDupli(data)) {
+				// System.out.println(data.sensor+"' , '"+ med_trata.substring(0, 6)+"'
+				// "+data.sensor.charAt(data.sensor.length()-1));
 				PreparedStatement ps = conn
-						.prepareStatement("INSERT INTO medicao(Hora, Tipo, Outlier, Leitura, ID_Zona) VALUES (' "+ a+ " ' "
-								+ ",' "+ data.sensor +"' , ' "+ 1+ " ' ,  ' "+ med_trata.substring(0, 6) +"'"+ 
-								", ' "+data.sensor.charAt(data.sensor.length()-1) +"' );");
-				
+						.prepareStatement("INSERT INTO medicao(Hora, Tipo, Outlier, Leitura, ID_Zona) VALUES (' " + a
+								+ " ' " + ",' " + data.sensor + "' , ' " + 1 + " ' ,  ' " + med_trata.substring(0, 6)
+								+ "'" + ", ' " + data.sensor.charAt(data.sensor.length() - 1) + "' );");
+
 				ps.executeUpdate();
 			} else {
-				//System.out.println("não e out     "+data.sensor+"' , '"+ med_trata.substring(0, 6) +"'  "+data.sensor.charAt(data.sensor.length()-1));
+				// System.out.println("não e out "+data.sensor+"' , '"+ med_trata.substring(0,
+				// 6) +"' "+data.sensor.charAt(data.sensor.length()-1));
 				PreparedStatement ps = conn
-						.prepareStatement("INSERT INTO medicao(Hora, Tipo, Outlier, Leitura, ID_Zona) VALUES (' "+ a+ " ' "
-								+ ",' "+ data.sensor +"' , ' "+ 0+ " ' ,  ' "+ med_trata.substring(0, 6) +"'"+ 
-								", ' "+data.sensor.charAt(data.sensor.length()-1) +"' );");
+						.prepareStatement("INSERT INTO medicao(Hora, Tipo, Outlier, Leitura, ID_Zona) VALUES (' " + a
+								+ " ' " + ",' " + data.sensor + "' , ' " + 0 + " ' ,  ' " + med_trata.substring(0, 6)
+								+ "'" + ", ' " + data.sensor.charAt(data.sensor.length() - 1) + "' );");
 				ps.executeUpdate();
 				outfree.add(data);
 			}
 		} else {
-			if (checkMysqlDupli(data)|| Float.valueOf(med_trata)<0) {
-				//System.out.println(data.sensor+"' , '"+ med_trata.substring(0, 6) +"'  "+data.sensor.charAt(data.sensor.length()-1));
-				a= new Timestamp(data.data.getTime());
+			if (checkMysqlDupli(data) || Float.valueOf(med_trata) < 0) {
+				// System.out.println(data.sensor+"' , '"+ med_trata.substring(0, 6) +"'
+				// "+data.sensor.charAt(data.sensor.length()-1));
+				a = new Timestamp(data.data.getTime());
 				PreparedStatement ps = conn
-						.prepareStatement("INSERT INTO medicao(Hora, Tipo, Outlier, Leitura, ID_Zona) VALUES (' "+ a+ " ' "
-								+ ",' "+ data.sensor +"' , ' "+ 1+ " ' ,  ' "+ med_trata.substring(0, 6) +"'"+ 
-								", ' "+data.sensor.charAt(data.sensor.length()-1) +"' );");
+						.prepareStatement("INSERT INTO medicao(Hora, Tipo, Outlier, Leitura, ID_Zona) VALUES (' " + a
+								+ " ' " + ",' " + data.sensor + "' , ' " + 1 + " ' ,  ' " + med_trata.substring(0, 6)
+								+ "'" + ", ' " + data.sensor.charAt(data.sensor.length() - 1) + "' );");
 				ps.executeUpdate();
 			} else {
-				//System.out.println(data.sensor+"' , '"+ med_trata.substring(0, 6) +"'  "+data.sensor.charAt(data.sensor.length()-1));
-				a= new Timestamp(data.data.getTime());
+				// System.out.println(data.sensor+"' , '"+ med_trata.substring(0, 6) +"'
+				// "+data.sensor.charAt(data.sensor.length()-1));
+				a = new Timestamp(data.data.getTime());
 				PreparedStatement ps = conn
-						.prepareStatement("INSERT INTO medicao(Hora, Tipo, Outlier, Leitura, ID_Zona) VALUES (' "+ a+ " ' "
-								+ ",' "+ data.sensor +"' , ' "+ 0+ " ' ,  ' "+ med_trata.substring(0, 6) +"'"+ 
-								", ' "+data.sensor.charAt(data.sensor.length()-1) +"' );");
+						.prepareStatement("INSERT INTO medicao(Hora, Tipo, Outlier, Leitura, ID_Zona) VALUES (' " + a
+								+ " ' " + ",' " + data.sensor + "' , ' " + 0 + " ' ,  ' " + med_trata.substring(0, 6)
+								+ "'" + ", ' " + data.sensor.charAt(data.sensor.length() - 1) + "' );");
 				ps.executeUpdate();
 
 				outfree.add(data);
@@ -206,38 +208,38 @@ public class Mysql_demo {
 	}
 
 	public boolean checkMysqlDupli(SensorData sens) throws SQLException {
-        Statement ps = conn.createStatement();
-        ResultSet r = ps.executeQuery("SELECT Hora FROM medicao ORDER BY Hora DESC LIMIT 2");
-        String a;
-        Timestamp b = new Timestamp(sens.data.getTime());
-        while (r.next()) {
-            a = r.getTimestamp("Hora").toString();
-            if (b.toString().equals(a)) {
-                return true;
-            }
-        }
-        return false;
-    }
+		Statement ps = conn.createStatement();
+		ResultSet r = ps.executeQuery("SELECT Hora FROM medicao ORDER BY Hora DESC LIMIT 2");
+		String a;
+		Timestamp b = new Timestamp(sens.data.getTime());
+		while (r.next()) {
+			a = r.getTimestamp("Hora").toString();
+			if (b.toString().equals(a)) {
+				return true;
+			}
+		}
+		return false;
+	}
 
-	public void checkParameters() {
+	public void checkParameters(SensorData sens) {
 		try {
 			int id_medicao = 9999;
-			Statement e= conn.createStatement();
+			Statement e = conn.createStatement();
 			ResultSet r2 = e.executeQuery("SELECT * FROM medicao");
-			
+			Timestamp a = null;
 
 			for (SensorData i : outfree) {
-				while(r2.next()) {
+				while (r2.next()) {
+					a = new Timestamp(r2.getTimestamp("Hora").getTime());
 					Timestamp b = new Timestamp(i.data.getTime());
-					if (r2.getTimestamp("Hora").toString().equals(b.toString())) {
-					id_medicao = Integer.valueOf(r2.getInt("ID_Medicao"));
-						}
+					if (a.equals(b) && r2.getString("Tipo").equals(" "+i.sensor)) {
+						id_medicao = Integer.valueOf(r2.getInt("ID_Medicao"));
 					}
-				
+				}
+
 			}
 			r2.close();
-			
-			
+
 			Statement ps = conn.createStatement();
 			ResultSet r = ps.executeQuery("SELECT * FROM parametro_cultura");
 			int Limite_Inf_Temp;
@@ -268,130 +270,178 @@ public class Mysql_demo {
 				Limite_Sup_Critico_Temp = r.getInt("Limite_Sup_Critico_Temp");
 				Limite_Sup_Critico_Luz = r.getInt("Limite_Sup_Critico_Luz");
 				Limite_Sup_Critico_Hum = r.getInt("Limite_Sup_Critico_Hum");
-				Zon = r.getInt("ID_Zona") ;
-				Zona= (char) (Zon+'0') ;
+				Zon = r.getInt("ID_Zona");
+				Zona = (char) (Zon + '0');
 				id_cultura = r.getInt("ID_Cultura");
 				for (SensorData i : outfree) {
 
 					BigDecimal decimal = new BigDecimal(i.medicao);
-					Timestamp timestamp = new Timestamp(System.currentTimeMillis());
+					//---------------------------------------------------------------------------------------------------------------------------
 					Statement stmt = conn.createStatement();
 					String query = "NULL";
-					
-					if (i.sensor.startsWith("T")) {
-						if (Limite_Sup_Temp <= Float.valueOf(i.medicao) && Float.valueOf(i.medicao) <= Limite_Sup_Critico_Temp) {
-							System.out.println(  i.sensor.startsWith("T") +"  "+ Zona+"  "+i.zona.charAt(1));
-							if (Zona ==i.zona.charAt(1) ) {
-								PreparedStatement aler = conn.prepareStatement("INSERT INTO alerta(Hora, Tipo_Alerta, Mensagem, ID_Cultura, ID_Medicao, Leitura ) " + "VALUES('" + timestamp + "','" + 0
-										+ "','ALERTA SUPERIOR do sensor " + i.sensor + " da zona " + i.zona + ".','"
-										+ id_cultura + "','" + id_medicao + "','" + decimal + "')");
-								aler.executeUpdate();
-								System.out.println("escrever");
-							}
-						} else if (Float.valueOf(i.medicao) >= Limite_Sup_Critico_Temp) {
-							System.out.println(  i.sensor.startsWith("T") +"  "+ Zona+"  "+i.zona.charAt(1));
-							if (Zona==i.zona.charAt(1)) {
-								PreparedStatement aler = conn.prepareStatement("INSERT INTO alerta(Hora, Tipo_Alerta, Mensagem, ID_Cultura, ID_Medicao, Leitura ) " + "VALUES('" + timestamp + "','" + 1
-										+ "','ALERTA CRÍTICO SUPERIOR do sensor " + i.sensor + " da zona " + i.zona
-										+ ".','" + id_cultura + "','" + id_medicao + "','" + decimal + "')");
-								aler.executeUpdate();
-								System.out.println("escrever2");
-							}
-						} else if (Limite_Inf_Temp >= Float.valueOf(i.medicao)
-								&& Float.valueOf(i.medicao) >= Limite_Inf_Critico_Temp) {
-							System.out.println(  i.sensor.startsWith("T") +"  "+ Zona+"  "+i.zona.charAt(1));
-							if (Zona==i.zona.charAt(1)) {
-								PreparedStatement aler = conn.prepareStatement("INSERT INTO alerta(Hora, Tipo_Alerta, Mensagem, ID_Cultura, ID_Medicao, Leitura ) " + "VALUES('" + timestamp + "','" + 0
-										+ "','ALERTA INFERIOR do sensor " + i.sensor + " da zona " + i.zona + ".','"
-										+ id_cultura + "','" + id_medicao + "','" + decimal + "')");
-								aler.executeUpdate();
-							}
-						} else if (Float.valueOf(i.medicao) <= Limite_Inf_Critico_Temp) {
-							System.out.println(  i.sensor.startsWith("T") +"  "+ Zona+"  "+i.zona.charAt(1));
-							if (Zona==i.zona.charAt(1)) {
-								PreparedStatement aler = conn.prepareStatement("INSERT INTO alerta(Hora, Tipo_Alerta, Mensagem, ID_Cultura, ID_Medicao, Leitura ) " + "VALUES('" + timestamp + "','" + 1
-										+ "','ALERTA CRÍTICO INFERIOR do sensor " + i.sensor + " da zona " + i.zona
-										+ ".','" + id_cultura + "','" + id_medicao + "','" + decimal + "')");
-								aler.executeUpdate();
-							}
-						}
-					}
-					else if (i.sensor.startsWith("H")) {
-						if (Limite_Sup_Hum <= Float.valueOf(i.medicao)&& Float.valueOf(i.medicao) <= Limite_Sup_Critico_Hum) {
-							System.out.println(  i.sensor.startsWith("H") +"  "+ Zona+"  "+i.zona.charAt(1));
-							if (Zona==i.zona.charAt(1)) {
-								PreparedStatement aler = conn.prepareStatement("INSERT INTO alerta(Hora, Tipo_Alerta, Mensagem, ID_Cultura, ID_Medicao, Leitura ) " + "VALUES('" + timestamp + "','" + 0
-										+ "','ALERTA SUPERIOR do sensor " + i.sensor + " da zona " + i.zona + ".','"
-										+ id_cultura + "','" + id_medicao + "','" + decimal + "')");
-								aler.executeUpdate();
-							}
-						} else if (Float.valueOf(i.medicao) >= Limite_Sup_Critico_Hum) {
-							System.out.println(  i.sensor.startsWith("H") +"  "+ Zona+"  "+i.zona.charAt(1));
-							if (Zona ==i.zona.charAt(1)) {
-								PreparedStatement aler = conn.prepareStatement("INSERT INTO alerta(Hora, Tipo_Alerta, Mensagem, ID_Cultura, ID_Medicao, Leitura )  " + "VALUES('" + timestamp + "','" + 1
-										+ "','ALERTA CRÍTICO SUPERIOR do sensor " + i.sensor + " da zona " + i.zona
-										+ ".','" + id_cultura + "','" + id_medicao + "','" + decimal + "')");
-								aler.executeUpdate();
-							}
-						} else if (Limite_Inf_Hum >= Float.valueOf(i.medicao)
-								&& Float.valueOf(i.medicao) >= Limite_Inf_Critico_Hum) {
-							System.out.println(  i.sensor.startsWith("H") +"  "+ Zona+"  "+i.zona.charAt(1));
-							if (Zona ==i.zona.charAt(1)) {
-								PreparedStatement aler = conn.prepareStatement("INSERT INTO alerta(Hora, Tipo_Alerta, Mensagem, ID_Cultura, ID_Medicao, Leitura ) " + "VALUES('" + timestamp + "','" + 0
-										+ "','ALERTA INFERIOR do sensor " + i.sensor + " da zona " + i.zona + ".','"
-										+ id_cultura + "','" + id_medicao + "','" + decimal + "')");
-								aler.executeUpdate();
-							}
 
-						} else if (Float.valueOf(i.medicao) <= Limite_Inf_Critico_Hum) {
-							System.out.println(  i.sensor.startsWith("H") +"  "+ Zona+"  "+i.zona.charAt(1));
-							if (Zona ==i.zona.charAt(1)) {
-								PreparedStatement aler = conn.prepareStatement("INSERT INTO alerta(Hora, Tipo_Alerta, Mensagem, ID_Cultura, ID_Medicao, Leitura ) " + "VALUES('" + timestamp + "','" + 1
-										+ "','ALERTA CRÍTICO INFERIOR do sensor " + i.sensor + " da zona " + i.zona
-										+ ".','" + id_cultura + "','" + id_medicao + "','" + decimal + "')");
-								aler.executeUpdate();
+					if (i.equals(sens)) {
+						if (i.sensor.startsWith("T")) {
+							if (Limite_Sup_Temp <= Float.valueOf(i.medicao)
+									&& Float.valueOf(i.medicao) <= Limite_Sup_Critico_Temp) {
+								// System.out.println( i.sensor.startsWith("T") +" "+ Zona+"
+								// "+i.zona.charAt(1));
+								if (Zona == i.zona.charAt(1)) {
+									PreparedStatement aler = conn.prepareStatement(
+											"INSERT INTO alerta(Hora, Tipo_Alerta, Mensagem, ID_Cultura, ID_Medicao, Leitura ) "
+													+ "VALUES('" + a + "','" + 0
+													+ "','ALERTA SUPERIOR do sensor " + i.sensor + " da zona " + i.zona
+													+ ".','" + id_cultura + "','" + id_medicao + "','" + decimal
+													+ "')");
+									aler.executeUpdate();
+									// System.out.println("escrever");
+								}
+							} else if (Float.valueOf(i.medicao) >= Limite_Sup_Critico_Temp) {
+								// System.out.println( i.sensor.startsWith("T") +" "+ Zona+"
+								// "+i.zona.charAt(1));
+								if (Zona == i.zona.charAt(1)) {
+									PreparedStatement aler = conn.prepareStatement(
+											"INSERT INTO alerta(Hora, Tipo_Alerta, Mensagem, ID_Cultura, ID_Medicao, Leitura ) "
+													+ "VALUES('" + a + "','" + 1
+													+ "','ALERTA CRÍTICO SUPERIOR do sensor " + i.sensor + " da zona "
+													+ i.zona + ".','" + id_cultura + "','" + id_medicao + "','"
+													+ decimal + "')");
+									aler.executeUpdate();
+									System.out.println("escrever2");
+								}
+							} else if (Limite_Inf_Temp >= Float.valueOf(i.medicao)
+									&& Float.valueOf(i.medicao) >= Limite_Inf_Critico_Temp) {
+								// System.out.println( i.sensor.startsWith("T") +" "+ Zona+"
+								// "+i.zona.charAt(1));
+								if (Zona == i.zona.charAt(1)) {
+									PreparedStatement aler = conn.prepareStatement(
+											"INSERT INTO alerta(Hora, Tipo_Alerta, Mensagem, ID_Cultura, ID_Medicao, Leitura ) "
+													+ "VALUES('" + a + "','" + 0
+													+ "','ALERTA INFERIOR do sensor " + i.sensor + " da zona " + i.zona
+													+ ".','" + id_cultura + "','" + id_medicao + "','" + decimal
+													+ "')");
+									aler.executeUpdate();
+								}
+							} else if (Float.valueOf(i.medicao) <= Limite_Inf_Critico_Temp) {
+								// System.out.println( i.sensor.startsWith("T") +" "+ Zona+"
+								// "+i.zona.charAt(1));
+								if (Zona == i.zona.charAt(1)) {
+									PreparedStatement aler = conn.prepareStatement(
+											"INSERT INTO alerta(Hora, Tipo_Alerta, Mensagem, ID_Cultura, ID_Medicao, Leitura ) "
+													+ "VALUES('" + a + "','" + 1
+													+ "','ALERTA CRÍTICO INFERIOR do sensor " + i.sensor + " da zona "
+													+ i.zona + ".','" + id_cultura + "','" + id_medicao + "','"
+													+ decimal + "')");
+									aler.executeUpdate();
+								}
+							}
+						} else if (i.sensor.startsWith("H")) {
+							if (Limite_Sup_Hum <= Float.valueOf(i.medicao)
+									&& Float.valueOf(i.medicao) <= Limite_Sup_Critico_Hum) {
+								// System.out.println( i.sensor.startsWith("H") +" "+ Zona+"
+								// "+i.zona.charAt(1));
+								if (Zona == i.zona.charAt(1)) {
+									PreparedStatement aler = conn.prepareStatement(
+											"INSERT INTO alerta(Hora, Tipo_Alerta, Mensagem, ID_Cultura, ID_Medicao, Leitura ) "
+													+ "VALUES('" + a + "','" + 0
+													+ "','ALERTA SUPERIOR do sensor " + i.sensor + " da zona " + i.zona
+													+ ".','" + id_cultura + "','" + id_medicao + "','" + decimal
+													+ "')");
+									aler.executeUpdate();
+								}
+							} else if (Float.valueOf(i.medicao) >= Limite_Sup_Critico_Hum) {
+								// System.out.println( i.sensor.startsWith("H") +" "+ Zona+"
+								// "+i.zona.charAt(1));
+								if (Zona == i.zona.charAt(1)) {
+									PreparedStatement aler = conn.prepareStatement(
+											"INSERT INTO alerta(Hora, Tipo_Alerta, Mensagem, ID_Cultura, ID_Medicao, Leitura )  "
+													+ "VALUES('" + a + "','" + 1
+													+ "','ALERTA CRÍTICO SUPERIOR do sensor " + i.sensor + " da zona "
+													+ i.zona + ".','" + id_cultura + "','" + id_medicao + "','"
+													+ decimal + "')");
+									aler.executeUpdate();
+								}
+							} else if (Limite_Inf_Hum >= Float.valueOf(i.medicao)
+									&& Float.valueOf(i.medicao) >= Limite_Inf_Critico_Hum) {
+								// System.out.println( i.sensor.startsWith("H") +" "+ Zona+"
+								// "+i.zona.charAt(1));
+								if (Zona == i.zona.charAt(1)) {
+									PreparedStatement aler = conn.prepareStatement(
+											"INSERT INTO alerta(Hora, Tipo_Alerta, Mensagem, ID_Cultura, ID_Medicao, Leitura ) "
+													+ "VALUES('" + a + "','" + 0
+													+ "','ALERTA INFERIOR do sensor " + i.sensor + " da zona " + i.zona
+													+ ".','" + id_cultura + "','" + id_medicao + "','" + decimal
+													+ "')");
+									aler.executeUpdate();
+								}
+
+							} else if (Float.valueOf(i.medicao) <= Limite_Inf_Critico_Hum) {
+								// System.out.println( i.sensor.startsWith("H") +" "+ Zona+"
+								// "+i.zona.charAt(1));
+								if (Zona == i.zona.charAt(1)) {
+									PreparedStatement aler = conn.prepareStatement(
+											"INSERT INTO alerta(Hora, Tipo_Alerta, Mensagem, ID_Cultura, ID_Medicao, Leitura ) "
+													+ "VALUES('" + a + "','" + 1
+													+ "','ALERTA CRÍTICO INFERIOR do sensor " + i.sensor + " da zona "
+													+ i.zona + ".','" + id_cultura + "','" + id_medicao + "','"
+													+ decimal + "')");
+									aler.executeUpdate();
+								}
+							}
+						} else if (i.sensor.startsWith("L")) {
+							// System.out.println( i.sensor.startsWith("L") +" "+ Zona+"
+							// "+i.zona.charAt(1));
+							if (Limite_Sup_Luz <= Float.valueOf(i.medicao)
+									&& Float.valueOf(i.medicao) <= Limite_Sup_Critico_Luz) {
+								if (Zona == i.zona.charAt(1)) {
+									PreparedStatement aler = conn.prepareStatement(
+											"INSERT INTO alerta(Hora, Tipo_Alerta, Mensagem, ID_Cultura, ID_Medicao, Leitura ) "
+													+ "VALUES('" + a + "','" + 0
+													+ "','ALERTA SUPERIOR do sensor " + i.sensor + " da zona " + i.zona
+													+ ".','" + id_cultura + "','" + id_medicao + "','" + decimal
+													+ "')'");
+									aler.executeUpdate();
+								}
+							} else if (Float.valueOf(i.medicao) >= Limite_Sup_Critico_Luz) {
+								// System.out.println( i.sensor.startsWith("L") +" "+ Zona+"
+								// "+i.zona.charAt(1));
+								if (Zona == i.zona.charAt(1)) {
+									PreparedStatement aler = conn.prepareStatement(
+											"INSERT INTO alerta(Hora, Tipo_Alerta, Mensagem, ID_Cultura, ID_Medicao, Leitura )  "
+													+ "VALUES('" + a + "','" + 1
+													+ "','ALERTA CRÍTICO SUPERIOR do sensor " + i.sensor + " da zona "
+													+ i.zona + ".','" + id_cultura + "','" + id_medicao + "','"
+													+ decimal + "')");
+									aler.executeUpdate();
+								}
+							} else if (Limite_Inf_Luz >= Float.valueOf(i.medicao)
+									&& Float.valueOf(i.medicao) >= Limite_Inf_Critico_Luz) {
+								// System.out.println( i.sensor.startsWith("L") +" "+ Zona+"
+								// "+i.zona.charAt(1));
+								if (Zona == i.zona.charAt(1)) {
+									PreparedStatement aler = conn.prepareStatement(
+											"INSERT INTO alerta(Hora, Tipo_Alerta, Mensagem, ID_Cultura, ID_Medicao, Leitura ) "
+													+ "VALUES('" + a + "','" + 0
+													+ "','ALERTA INFERIOR do sensor " + i.sensor + " da zona " + i.zona
+													+ ".','" + id_cultura + "','" + id_medicao + "','" + decimal
+													+ "')");
+									aler.executeUpdate();
+								}
+							} else if (Float.valueOf(i.medicao) <= Limite_Inf_Critico_Luz) {
+								// System.out.println( i.sensor.startsWith("L") +" "+ Zona+"
+								// "+i.zona.charAt(1));
+								if (Zona == i.zona.charAt(1)) {
+									PreparedStatement aler = conn.prepareStatement(
+											"INSERT INTO alerta(Hora, Tipo_Alerta, Mensagem, ID_Cultura, ID_Medicao, Leitura ) VALUES('"
+													+ a + "','" + 1 + "','ALERTA CRÍTICO INFERIOR do sensor "
+													+ i.sensor + " da zona " + i.zona + ".','" + id_cultura + "','"
+													+ id_medicao + "','" + decimal + "')");
+									aler.executeUpdate();
+								}
 							}
 						}
+
 					}
-					else if (i.sensor.startsWith("L")) {
-						System.out.println(  i.sensor.startsWith("L") +"  "+ Zona+"  "+i.zona.charAt(1));
-						if (Limite_Sup_Luz <= Float.valueOf(i.medicao)
-								&& Float.valueOf(i.medicao) <= Limite_Sup_Critico_Luz) {
-							if (Zona ==i.zona.charAt(1)) {
-								PreparedStatement aler = conn.prepareStatement("INSERT INTO alerta(Hora, Tipo_Alerta, Mensagem, ID_Cultura, ID_Medicao, Leitura ) " + "VALUES('" + timestamp + "','" + 0
-										+ "','ALERTA SUPERIOR do sensor " + i.sensor + " da zona " + i.zona + ".','"
-										+ id_cultura + "','" + id_medicao + "','" + decimal + "')'");
-								aler.executeUpdate();
-							}
-						} else if (Float.valueOf(i.medicao) >= Limite_Sup_Critico_Luz) {
-							System.out.println(  i.sensor.startsWith("L") +"  "+ Zona+"  "+i.zona.charAt(1));
-							if (Zona ==i.zona.charAt(1)) {
-								PreparedStatement aler = conn.prepareStatement("INSERT INTO alerta(Hora, Tipo_Alerta, Mensagem, ID_Cultura, ID_Medicao, Leitura )  " + "VALUES('" + timestamp + "','" + 1
-										+ "','ALERTA CRÍTICO SUPERIOR do sensor " + i.sensor + " da zona " + i.zona
-										+ ".','" + id_cultura + "','" + id_medicao + "','" + decimal + "')");
-								aler.executeUpdate();
-							}
-						} else if (Limite_Inf_Luz >= Float.valueOf(i.medicao)
-								&& Float.valueOf(i.medicao) >= Limite_Inf_Critico_Luz) {
-							System.out.println(  i.sensor.startsWith("L") +"  "+ Zona+"  "+i.zona.charAt(1));
-							if (Zona ==i.zona.charAt(1)) {
-								PreparedStatement aler = conn.prepareStatement("INSERT INTO alerta(Hora, Tipo_Alerta, Mensagem, ID_Cultura, ID_Medicao, Leitura ) " + "VALUES('" + timestamp + "','" + 0
-										+ "','ALERTA INFERIOR do sensor " + i.sensor + " da zona " + i.zona + ".','"
-										+ id_cultura + "','" + id_medicao + "','" + decimal + "')");
-								aler.executeUpdate();
-							}
-						} else if (Float.valueOf(i.medicao) <= Limite_Inf_Critico_Luz) {
-							System.out.println(  i.sensor.startsWith("L") +"  "+ Zona+"  "+i.zona.charAt(1));
-							if (Zona ==i.zona.charAt(1)) {
-								PreparedStatement aler = conn.prepareStatement("INSERT INTO alerta(Hora, Tipo_Alerta, Mensagem, ID_Cultura, ID_Medicao, Leitura ) VALUES('" + timestamp + "','" + 1
-										+ "','ALERTA CRÍTICO INFERIOR do sensor " + i.sensor + " da zona " + i.zona
-										+ ".','" + id_cultura + "','" + id_medicao + "','" + decimal + "')");
-								aler.executeUpdate();
-							}
-						}
-					}
-					
-					
 				}
 			}
 		} catch (SQLException e) {
