@@ -5,6 +5,8 @@ import java.math.RoundingMode;
 import java.sql.*;
 import java.text.DecimalFormat;
 import java.text.SimpleDateFormat;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
@@ -57,11 +59,13 @@ public class Mysql_demo {
 
 	public void start() throws SQLException, InterruptedException {
 		while (true) {
+			//long t = System.currentTimeMillis();
 			receive_data();
 			splitMeasurement();
 
 			received.clear();
 			outfree.clear();
+			//System.out.println(System.currentTimeMillis()-t);
 			Thread.sleep(1000);
 		}
 
@@ -76,7 +80,7 @@ public class Mysql_demo {
 			for (SensorData a : mcd.sensors) {
 				received.add(a);
 			}
-
+				
 		}
 
 	}
@@ -92,6 +96,7 @@ public class Mysql_demo {
 			}
 			if (i.sensor.startsWith("H")) {
 				insertMysqlMeasurement(i);
+				System.out.println(i);
 				checkParameters(i);
 			}
 			if (i.sensor.startsWith("L")) {
@@ -148,7 +153,7 @@ public class Mysql_demo {
 
 	// fazer os diferentes inserts para as tabelas
 	public void insertMysqlMeasurement(SensorData data) throws SQLException {
-		// inserir tb a hora de insersert na taab mysql
+		
 		Timestamp a = new Timestamp(data.data.getTime());
 		SimpleDateFormat formatter = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
 
@@ -211,6 +216,7 @@ public class Mysql_demo {
 	}
 
 	public boolean checkMysqlDupli(SensorData sens) throws SQLException {
+		// verificar a hora da medição e o tipo e a zona e se houver igual não insere
 		Statement ps = conn.createStatement();
 		ResultSet r = ps.executeQuery("SELECT * FROM medicao ORDER BY Hora DESC LIMIT 5");
 		String a;
@@ -239,13 +245,26 @@ public class Mysql_demo {
 					if (a.equals(b) && (r2.getInt("ID_Zona") == Integer.valueOf(sens.zona.split("")[1])
 							&& r2.getString("Tipo").equals(sens.sensor.split("")[0]))) {
 						id_medicao = Integer.valueOf(r2.getInt("ID_Medicao"));
-						System.out.println("Entrou");
+						//System.out.println("Entrou");
 					}
 				}
 
 			}
 			r2.close();
-
+			
+			
+			//cultura....--- timeout
+			//tuplos ou lista de acc
+				
+			Statement ps2 = conn.createStatement();
+			ResultSet r3 = ps2.executeQuery("SELECT * FROM cultura");
+			int timeOut;
+			int ID_cultura2;// id cultura da tabela cultura
+			while (r3.next()) {
+				 timeOut = r3.getInt("Time-out_Avisos");
+				 ID_cultura2 = r3.getInt("ID_Cultura");
+			}
+			
 			Statement ps = conn.createStatement();
 			ResultSet r = ps.executeQuery("SELECT * FROM parametro_cultura");
 			int Limite_Inf_Temp;
@@ -261,7 +280,7 @@ public class Mysql_demo {
 			int Limite_Sup_Critico_Luz;
 			int Limite_Sup_Critico_Hum;
 			char Zona;
-			int id_cultura;
+			int id_cultura;//id cultura da tabela parametro_cultura
 			int Zon;
 			while (r.next()) {
 				Limite_Inf_Temp = r.getInt("Limite_Inf_Temp");
@@ -325,11 +344,13 @@ public class Mysql_demo {
 													+ i.sensor + " da zona " + i.zona + ".','" + id_cultura + "','"
 													+ id_medicao + "','" + decimal + "')");
 									aler.executeUpdate();
+									
 								}
 							} else if (Float.valueOf(i.medicao) <= Limite_Inf_Critico_Temp) {
 								// System.out.println( i.sensor.startsWith("T") +" "+ Zona+"
 								// "+i.zona.charAt(1));
 								if (Zona == i.zona.charAt(1)) {
+									
 									PreparedStatement aler = conn.prepareStatement(
 											"INSERT INTO alerta(Hora, Tipo_Alerta, Mensagem, ID_Cultura, ID_Medicao, Leitura ) "
 													+ "VALUES('" + a + "','" + 1
