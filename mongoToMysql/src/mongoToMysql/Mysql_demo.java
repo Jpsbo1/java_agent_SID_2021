@@ -304,7 +304,7 @@ public class Mysql_demo {
 					// ---------------------------------------------------------------------------------------------------------------------------
 					Statement stmt = conn.createStatement();
 					String query = "NULL";
-
+					
 					if (i.equals(sens)) {
 						if (i.sensor.startsWith("T")) {
 							if (Limite_Sup_Temp <= Float.valueOf(i.medicao)
@@ -331,6 +331,7 @@ public class Mysql_demo {
 													+ i.zona + ".','" + id_cultura + "','" + id_medicao + "','"
 													+ decimal + "')");
 									aler.executeUpdate();
+									//current time
 									// System.out.println("escrever2");
 								}
 							} else if (Limite_Inf_Temp >= Float.valueOf(i.medicao)
