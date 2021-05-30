@@ -1,31 +1,26 @@
 package mongoToMysql;
- 
-import java.math.BigDecimal;
-import java.math.RoundingMode;
-import java.sql.*;
-import java.text.DecimalFormat;
-import java.text.SimpleDateFormat;
-import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
-import java.util.LinkedList;
-import java.util.List;
- 
-import org.bson.Document;
- 
+
 import com.google.gson.Gson;
-import com.mongodb.*;
-import com.mongodb.DB;
-import com.mongodb.DBCollection;
-import com.mongodb.DBCursor;
 import com.mongodb.MongoClient;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoDatabase;
 import com.mongodb.client.model.Sorts;
-import com.mysql.cj.protocol.x.SyncFlushDeflaterOutputStream;
- 
-import mongoToMysql.Pair;
- 
+import mongoToMysql.settings.AppSettings;
+import mongoToMysql.settings.MongoSettings;
+import mongoToMysql.settings.SqlSettings;
+import org.bson.Document;
+
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileReader;
+import java.io.IOException;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.sql.*;
+import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+import java.util.List;
+
 public class Mysql_demo {
     private Connection conn = null;
     private MongoClient mongoC;
@@ -37,20 +32,19 @@ public class Mysql_demo {
     ArrayList<Pair<Integer, Timestamp>> lastAlerts = new ArrayList<Pair<Integer, Timestamp>>();
     ArrayList<Pair<Integer, Integer>> timeouts = new ArrayList<Pair<Integer, Integer>>();
 
-    public void mongodbConnection() {
+    public void mongodbConnection(String ip, int port, String database, String collection) {
  
-        mongoC = new MongoClient("localhost", 27017);
-        db = mongoC.getDatabase("sid2021");
-        coll = db.getCollection("sid2021");
+        mongoC = new MongoClient(ip, port);
+        db = mongoC.getDatabase(database);
+        coll = db.getCollection(collection);
  
     }
  
-    public void mysqlConnection() {
-        String url = "jdbc:mysql://localhost:3306/";
-        String dbName = "lab";
+    public void mysqlConnection(String ip, int port, String db, String username, String password) {
+        String url = "jdbc:mysql://" + ip + ":" + port + "/";
+        String dbName = db;
         String driver = "com.mysql.cj.jdbc.Driver";
-        String userName = "root";
-        String password = "";
+        String userName = username;
         try {
             Class.forName(driver).newInstance();
             conn = DriverManager.getConnection(url + dbName, userName, password);
@@ -550,9 +544,30 @@ public class Mysql_demo {
     }
  
     public static void main(String[] args) throws SQLException {
+        AppSettings settings = null;
+
+        File f = new File("settings.json");
+        Gson gson = new Gson();
+        FileReader fr;
+        try {
+            System.out.println("Reading settings from: " + f.getAbsolutePath());
+            fr = new FileReader(f);
+            settings = gson.fromJson(fr, AppSettings.class);
+            fr.close();
+        } catch (FileNotFoundException e) {
+            System.err.println("Settings file not found! Creating one for you. The application will then close");
+            AppSettings.createModel();
+            return;
+        } catch (IOException e) {
+            e.printStackTrace();
+            return;
+        }
+
         Mysql_demo demo = new Mysql_demo();
-        demo.mongodbConnection();
-        demo.mysqlConnection();
+        MongoSettings mongo = settings.mongo;
+        demo.mongodbConnection(mongo.ip, mongo.port, mongo.database, mongo.collection);
+        SqlSettings sql = settings.sql;
+        demo.mysqlConnection(sql.ip, sql.port, sql.db, sql.credentials.username, sql.credentials.password);
  
         try {
             demo.start();
